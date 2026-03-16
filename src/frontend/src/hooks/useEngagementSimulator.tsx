@@ -2,6 +2,19 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { SAMPLE_COMMENTS, useApp } from "../context/AppContext";
 
+const CPM_BY_NICHE: Record<string, number> = {
+  Tech: 7,
+  Finance: 7,
+  Education: 4,
+  Fitness: 5,
+  Travel: 5,
+  Comedy: 3.5,
+  Fashion: 3.5,
+  Gaming: 3.5,
+  Memes: 2,
+  Food: 2,
+};
+
 export function useEngagementSimulator() {
   const {
     posts,
@@ -10,6 +23,7 @@ export function useEngagementSimulator() {
     setProfile,
     setAchievements,
     setAnalyticsData,
+    setMonetization,
     profile,
     achievements,
   } = useApp();
@@ -20,30 +34,27 @@ export function useEngagementSimulator() {
   const achievementsRef = useRef(achievements);
   achievementsRef.current = achievements;
 
+  // Engagement simulation
   useEffect(() => {
     const interval = setInterval(() => {
       const followers = profileRef.current.followers;
+      const niche = profileRef.current.niche || "Tech";
+      const cpm = CPM_BY_NICHE[niche] ?? 3.5;
+
       setPosts((prev) => {
         const updated = prev.map((post) => {
           const ageMs = Date.now() - post.timestamp;
           const ageMin = ageMs / 60000;
 
-          // Wave-based reach calculation
-          // Phase 1 (0-2 min): reach 10-20% of followers over 40 ticks
-          // Phase 2 (2-10 min): expand if strong engagement
-          // Phase 3 (10+ min): viral reach to non-followers
           let viewerBase: number;
           if (ageMin < 2) {
-            // Phase 1: spread over 40 ticks
             viewerBase = Math.floor(
               (followers * (0.1 + Math.random() * 0.1)) / 40,
             );
           } else if (ageMin < 10) {
-            // Phase 2: reduced rate
             const expansionMult = post.engagementScore > 200 ? 1.5 : 0.7;
             viewerBase = Math.floor(((followers * 0.05) / 160) * expansionMult);
           } else {
-            // Phase 3: viral boost or slow decay
             if (post.isTrending) {
               viewerBase = Math.floor(followers * 0.002 * (1 + Math.random()));
             } else {
@@ -103,7 +114,6 @@ export function useEngagementSimulator() {
           const wasViral = post.isTrending;
           const isNowViral = newScore > 500;
 
-          // Follower gains: shares > comments > likes
           const followersFromShares =
             newShareDelta * (0.5 + Math.random() * 0.5);
           const followersFromComments =
@@ -132,6 +142,19 @@ export function useEngagementSimulator() {
                 type: "follower_gain",
               });
             }
+          }
+
+          // Ad revenue drip
+          const earned = ((viewerBase * cpm) / 1000) * 0.01;
+          if (earned > 0) {
+            setMonetization((prev) => ({
+              ...prev,
+              adRevenue: prev.adRevenue + earned,
+              totalEarnings: prev.totalEarnings + earned,
+              dailyEarnings: prev.dailyEarnings.map((v, i) =>
+                i === prev.dailyEarnings.length - 1 ? v + earned : v,
+              ),
+            }));
           }
 
           if (!wasViral && isNowViral) {
@@ -205,7 +228,6 @@ export function useEngagementSimulator() {
           }
         }
 
-        // Check achievements based on profile
         const currentFollowers = profileRef.current.followers;
         const currentAchievements = achievementsRef.current;
         const updatesNeeded: string[] = [];
@@ -239,8 +261,10 @@ export function useEngagementSimulator() {
     setProfile,
     setAchievements,
     setAnalyticsData,
+    setMonetization,
   ]);
 
+  // Follower growth chart update
   useEffect(() => {
     const interval = setInterval(() => {
       setAnalyticsData((a) => {
@@ -253,6 +277,88 @@ export function useEngagementSimulator() {
     }, 30000);
     return () => clearInterval(interval);
   }, [setAnalyticsData]);
+
+  // Fan tips simulation
+  useEffect(() => {
+    const tipMessages = [
+      { amount: 5, msg: "A fan tipped you $5! 💸" },
+      {
+        amount: 10,
+        msg: "A supporter sent $10 during your post's viral run! 🔥",
+      },
+      { amount: 20, msg: "A loyal fan sent you $20 as appreciation! ❤️" },
+      { amount: 3, msg: "Someone tipped $3 on your latest post! 🎉" },
+      { amount: 50, msg: "A big fan just tipped you $50! 🚀" },
+    ];
+    let timer: ReturnType<typeof setTimeout>;
+    const fire = () => {
+      const t = tipMessages[Math.floor(Math.random() * tipMessages.length)];
+      addNotification({ icon: "💰", message: t.msg, type: "tip" });
+      setMonetization((prev) => ({
+        ...prev,
+        tipRevenue: prev.tipRevenue + t.amount,
+        totalEarnings: prev.totalEarnings + t.amount,
+        dailyEarnings: prev.dailyEarnings.map((v, i) =>
+          i === prev.dailyEarnings.length - 1 ? v + t.amount : v,
+        ),
+      }));
+      const delay = 30000 + Math.random() * 60000;
+      timer = setTimeout(fire, delay);
+    };
+    timer = setTimeout(fire, 45000 + Math.random() * 45000);
+    return () => clearTimeout(timer);
+  }, [addNotification, setMonetization]);
+
+  // Sponsorship unlock check
+  const unlockedTiersRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const followers = profile.followers;
+    const milestones = [
+      {
+        threshold: 10000,
+        tier: "small" as const,
+        brand: "Nova Gear",
+        value: 500,
+      },
+      {
+        threshold: 100000,
+        tier: "ambassador" as const,
+        brand: "TechWave",
+        value: 2500,
+      },
+      {
+        threshold: 1000000,
+        tier: "premium" as const,
+        brand: "MegaBrand Global",
+        value: 15000,
+      },
+    ];
+    for (const milestone of milestones) {
+      if (
+        followers >= milestone.threshold &&
+        !unlockedTiersRef.current.has(milestone.tier)
+      ) {
+        unlockedTiersRef.current.add(milestone.tier);
+        const deal = {
+          id: `deal-${milestone.tier}-${Date.now()}`,
+          brandName: milestone.brand,
+          dealValue: milestone.value,
+          tier: milestone.tier,
+          status: "pending" as const,
+        };
+        setMonetization((prev) => ({
+          ...prev,
+          activeSponsorships: [...prev.activeSponsorships, deal],
+        }));
+        addNotification({
+          icon: "🤝",
+          message: `Brand deal offer! ${milestone.brand} wants to sponsor you for $${milestone.value.toLocaleString()}!`,
+          type: "sponsorship",
+        });
+        toast(`🤝 New brand deal from ${milestone.brand}!`, { duration: 5000 });
+      }
+    }
+  }, [profile.followers, addNotification, setMonetization]);
 
   const { setConversations, setUnreadDMs } = useApp();
   useEffect(() => {

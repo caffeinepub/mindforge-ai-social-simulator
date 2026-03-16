@@ -2,12 +2,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp } from "lucide-react";
 import { useApp } from "../context/AppContext";
+import { getMomentumSignal } from "../utils/viralEngine";
 
 export default function Trending() {
   const { posts } = useApp();
   const trending = [...posts]
-    .filter((p) => p.engagementScore > 200)
-    .sort((a, b) => b.engagementScore - a.engagementScore);
+    .filter((p) => p.engagementScore > 200 || (p.viralStage ?? 0) >= 2)
+    .sort((a, b) => {
+      const stageDiff = (b.viralStage ?? 0) - (a.viralStage ?? 0);
+      if (stageDiff !== 0) return stageDiff;
+      return b.engagementScore - a.engagementScore;
+    });
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 py-6 px-4">
@@ -55,6 +60,19 @@ export default function Trending() {
                   🔥 Trending
                 </Badge>
               )}
+              {(post.viralStage ?? 0) > 0 &&
+                getMomentumSignal(post.viralStage ?? 0) && (
+                  <Badge
+                    style={{
+                      background: "oklch(0.22 0.03 280 / 0.8)",
+                      color: "oklch(0.7 0.2 295)",
+                      border: "1px solid oklch(0.35 0.03 280 / 0.4)",
+                    }}
+                    className="text-xs"
+                  >
+                    📈 {getMomentumSignal(post.viralStage ?? 0)}
+                  </Badge>
+                )}
             </div>
             <p className="text-sm text-foreground line-clamp-2 mb-3">
               {post.caption}

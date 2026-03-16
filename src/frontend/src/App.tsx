@@ -4,13 +4,17 @@ import NotificationsSidebar from "./components/NotificationsSidebar";
 import Sidebar from "./components/Sidebar";
 import { AppProvider, useApp } from "./context/AppContext";
 import { useIsMobile } from "./hooks/use-mobile";
+import { useAIInfluencers } from "./hooks/useAIInfluencers";
 import { useEngagementSimulator } from "./hooks/useEngagementSimulator";
+import { useViralEngine } from "./hooks/useViralEngine";
 import Analytics from "./pages/Analytics";
 import Explore from "./pages/Explore";
 import HashtagPage from "./pages/HashtagPage";
 import HomeFeed from "./pages/HomeFeed";
 import Leaderboard from "./pages/Leaderboard";
+import MerchStore from "./pages/MerchStore";
 import Messages from "./pages/Messages";
+import Monetization from "./pages/Monetization";
 import Profile from "./pages/Profile";
 import Trending from "./pages/Trending";
 
@@ -18,6 +22,8 @@ function AppShell() {
   const { currentRoute, navigate } = useApp();
   const isMobile = useIsMobile();
   useEngagementSimulator();
+  useAIInfluencers();
+  useViralEngine();
 
   const activePage = currentRoute.page;
 
@@ -35,6 +41,10 @@ function AppShell() {
         return <Profile />;
       case "analytics":
         return <Analytics />;
+      case "monetization":
+        return <Monetization />;
+      case "merch-store":
+        return <MerchStore />;
       case "leaderboard":
         return <Leaderboard />;
       case "user-profile":

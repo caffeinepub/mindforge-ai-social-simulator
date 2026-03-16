@@ -1,6 +1,7 @@
 import {
   BarChart2,
   Compass,
+  DollarSign,
   Home,
   MessageCircle,
   TrendingUp,
@@ -16,6 +17,7 @@ const navItems = [
   { id: "messages", icon: MessageCircle, ocid: "nav.messages.link" },
   { id: "profile", icon: User, ocid: "nav.profile.link" },
   { id: "analytics", icon: BarChart2, ocid: "nav.analytics.link" },
+  { id: "monetization", icon: DollarSign, ocid: "nav.monetization.link" },
   { id: "leaderboard", icon: Trophy, ocid: "nav.leaderboard.link" },
 ];
 
@@ -46,7 +48,9 @@ export default function MobileNav({ activePage, onNavigate }: Props) {
         >
           <div className="relative">
             <Icon
-              className={`w-5 h-5 ${activePage === id ? "text-purple-400" : "text-muted-foreground"}`}
+              className={`w-5 h-5 ${
+                activePage === id ? "text-purple-400" : "text-muted-foreground"
+              }`}
             />
             {id === "messages" && unreadDMs > 0 && (
               <span

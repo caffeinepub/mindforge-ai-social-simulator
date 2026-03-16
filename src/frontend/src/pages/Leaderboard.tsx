@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Trophy, Users, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "../context/AppContext";
+import { AI_CREATORS } from "../utils/aiInfluencers";
 import { generateUser } from "../utils/simulatedUsers";
 
 type SortKey = "followers" | "score";
@@ -31,7 +32,7 @@ export default function Leaderboard() {
     return () => clearTimeout(t);
   }, []);
 
-  const simUsers = Array.from({ length: 49 }, (_, i) => generateUser(i + 1));
+  const simUsers = Array.from({ length: 30 }, (_, i) => generateUser(i + 1));
   const playerEntry = {
     id: "me",
     displayName: profile.name,
@@ -43,8 +44,20 @@ export default function Leaderboard() {
     isPlayer: true,
   };
 
+  const aiEntries = AI_CREATORS.map((c) => ({
+    id: c.id,
+    displayName: c.name,
+    username: c.username,
+    avatar: c.avatar,
+    followerCount: c.followerCount,
+    engagementScore: c.engagementScore,
+    creatorLevel: c.creatorLevel,
+    isPlayer: false,
+  }));
+
   const allEntries = [
     ...simUsers.map((u) => ({ ...u, isPlayer: false })),
+    ...aiEntries,
     playerEntry,
   ];
   const sorted = [...allEntries].sort((a, b) =>

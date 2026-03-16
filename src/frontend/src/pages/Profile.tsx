@@ -99,6 +99,7 @@ export default function Profile({ userId }: Props) {
     username: profile.username,
     bio: profile.bio,
     avatar: profile.avatar,
+    niche: profile.niche,
   });
   const [avatarTab, setAvatarTab] = useState<"url" | "upload" | "preset">(
     "url",
@@ -215,7 +216,21 @@ export default function Profile({ userId }: Props) {
             <p className="text-muted-foreground text-sm mb-2">
               {displayProfile.username}
             </p>
-            <p className="text-sm text-foreground mb-4">{displayProfile.bio}</p>
+            <p className="text-sm text-foreground mb-2">{displayProfile.bio}</p>
+            {isOwnProfile && profile.niche && (
+              <div className="mb-3">
+                <span
+                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium"
+                  style={{
+                    background: "oklch(0.55 0.22 295 / 0.2)",
+                    color: "oklch(0.72 0.22 295)",
+                    border: "1px solid oklch(0.55 0.22 295 / 0.3)",
+                  }}
+                >
+                  🎯 {profile.niche}
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               {isOwnProfile ? (
                 <>
@@ -234,6 +249,7 @@ export default function Profile({ userId }: Props) {
                         username: profile.username,
                         bio: profile.bio,
                         avatar: profile.avatar,
+                        niche: profile.niche,
                       });
                       setEditOpen(true);
                     }}
@@ -665,6 +681,46 @@ export default function Profile({ userId }: Props) {
                 className="mt-1 resize-none"
                 rows={2}
               />
+            </div>
+            <div>
+              <Label className="text-sm text-muted-foreground">
+                Content Niche
+              </Label>
+              <select
+                data-ocid="profile.niche.select"
+                value={editForm.niche}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, niche: e.target.value }))
+                }
+                className="mt-1 w-full px-3 py-2 rounded-xl text-sm"
+                style={{
+                  background: "oklch(0.13 0.016 280 / 0.6)",
+                  border: "1px solid oklch(0.28 0.025 280 / 0.5)",
+                  color: "oklch(0.95 0.01 260)",
+                  outline: "none",
+                }}
+              >
+                {[
+                  "Tech",
+                  "Finance",
+                  "Fitness",
+                  "Comedy",
+                  "Memes",
+                  "Travel",
+                  "Gaming",
+                  "Fashion",
+                  "Food",
+                  "Education",
+                ].map((n) => (
+                  <option
+                    key={n}
+                    value={n}
+                    style={{ background: "oklch(0.16 0.018 280)" }}
+                  >
+                    {n}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <Label className="text-sm text-muted-foreground">

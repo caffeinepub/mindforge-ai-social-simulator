@@ -11,7 +11,9 @@ import StoryBar from "../components/StoryBar";
 import StoryViewer from "../components/StoryViewer";
 import { useApp } from "../context/AppContext";
 import type { PostItem, Story } from "../context/AppContext";
+import { extractHashtags } from "../context/AppContext";
 import { generatePostsForUser } from "../utils/simulatedUsers";
+import { computePostStrength } from "../utils/viralEngine";
 
 const SKEL_IDS = ["s1", "s2", "s3"];
 const BOUNCE_IDS = ["b1", "b2", "b3"];
@@ -31,6 +33,53 @@ function FeedSkeleton() {
         <Skeleton className="h-3 w-full" />
         <Skeleton className="h-3 w-3/4" />
       </div>
+    </div>
+  );
+}
+
+function PostStrengthMeter({ caption }: { caption: string }) {
+  const hashtags = extractHashtags(caption);
+  const score = computePostStrength(caption, hashtags);
+  const label =
+    score < 26
+      ? "Weak"
+      : score < 51
+        ? "Fair"
+        : score < 76
+          ? "Strong"
+          : "Excellent";
+  const color =
+    score < 26
+      ? "oklch(0.6 0.2 25)"
+      : score < 51
+        ? "oklch(0.75 0.18 65)"
+        : score < 76
+          ? "oklch(0.72 0.18 145)"
+          : "oklch(0.7 0.22 295)";
+  const tip =
+    hashtags.length < 2
+      ? "Tip: Add 2–4 hashtags for more reach"
+      : caption.split(/\s+/).filter(Boolean).length < 5
+        ? "Tip: Write a longer caption"
+        : "Looking great! Post at peak hours for extra reach";
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">Post Strength</span>
+        <span className="text-xs font-semibold" style={{ color }}>
+          {label}
+        </span>
+      </div>
+      <div
+        className="h-1.5 rounded-full overflow-hidden"
+        style={{ background: "oklch(0.22 0.02 280)" }}
+      >
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${score}%`, background: color }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">{tip}</p>
     </div>
   );
 }
@@ -189,6 +238,8 @@ export default function HomeFeed() {
             rows={2}
           />
         </div>
+
+        {caption.trim().length > 0 && <PostStrengthMeter caption={caption} />}
 
         {imagePreviews.length > 0 && (
           <div className="flex gap-2 flex-wrap">

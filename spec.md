@@ -1,75 +1,52 @@
-# MindForge V3 — Large Scale Social Network Simulator
+# MindForge AI Social Simulator
 
 ## Current State
-
-MindForge is a frontend-only, session-based social media simulator built with React, TypeScript, Tailwind CSS, and Chart.js. The current V2 implementation includes:
-
-- Home feed with infinite scroll, post creation, and engagement simulation
-- Trending and Explore pages
-- Messages (DM simulation)
-- Profile page with editable avatar, bio, follower/following counts, creator level, achievements, and posts grid
-- Post Detail View with comments and prev/next navigation
-- Engagement engine with wave-based simulation and viral scoring
-- Analytics dashboard with Chart.js charts
-- Boost Followers (3 packages)
-- Notifications sidebar
-- Achievement system
-- Dark glassmorphism UI, responsive layout
+MindForge V4 Phase 2 is complete. The app has:
+- Full post feed, engagement simulation, wave-based engagement engine
+- AI Influencer Ecosystem with 50 AI creators posting, commenting, collaborating
+- Creator Economy: Monetization page, Merch Store, Brand Sponsorships, Fan Tips
+- PostItem has fields: id, likes, comments, shares, saves, views, reach, impressions, engagementScore, isTrending
+- PostDetailView shows engagement metrics (views, reach, engagement rate)
+- HomeFeed has a post creation box with caption textarea and image upload
+- useAIInfluencers.ts handles background AI activity and notifications
+- No viral stage tracking, no post strength meter, no algorithm update system
 
 ## Requested Changes (Diff)
 
 ### Add
-
-- **Virtualized user simulation**: Dynamically generate simulated users/posts on-demand as user scrolls; never load millions into memory. Each simulated user has username, avatar, bio, follower/following count, and posts with engagement metrics.
-- **Story system**: Story bar at top of feed. Users can upload story images. View stories from followed/simulated users with tap navigation, viewer count, 24-minute session expiry, and 24h label.
-- **Hashtag system**: Posts support hashtags (#tag). Hashtags are clickable and link to a HashtagPage showing related posts. Trending hashtags section in Explore.
-- **Save/Bookmark posts**: Save button on posts. Saved Posts section in profile page.
-- **Nested comment replies**: Reply to any comment; replies appear indented under parent comment.
-- **Multi-image carousel posts**: Post creation supports up to 5 images. Posts render as swipeable carousel.
-- **Full follow/unfollow system**: Follow/unfollow any simulated user. Follower and following counts update in real time.
-- **Followers list modal**: View who follows a profile. Ability to follow back from this list.
-- **Following list modal**: View who a profile follows. Ability to unfollow directly from this list.
-- **Profile navigation**: Clicking any username (in feed, post detail, comments, follower/following lists) navigates to that user's profile.
-- **Creator Leaderboard page**: Ranked list of top creators by followers and engagement score.
-- **Expanded achievement system**: 15 milestone badges with unlock animations (First Post, First Comment, First Share, 100/500/1k/5k/10k Followers, First Viral Post, 10 Posts Created, 100/1k Likes Received, Top Trending Post, Creator Level 5, Creator Level 10).
+- `viralStage` field (0-4) to PostItem type in AppContext
+- `viralScore` field to PostItem (computed from engagement signals)
+- `useViralEngine.ts` hook: runs on interval, advances post viral stages based on viralScore, fires momentum notifications for user's posts
+- `viralEngine.ts` utility: viral score formula, stage thresholds, algorithm weight system (mutable weights for shares/comments/likes/saves), trending hashtag boost logic
+- `PostStrengthMeter` component: live meter shown in HomeFeed post creation box, reacts to caption length, hashtag count, and time of day (simulated posting time score). Shows a labeled progress bar with text like "Weak", "Good", "Strong", "Excellent"
+- Algorithm Update notification system in `useViralEngine.ts`: fires every 3-5 minutes, randomly shifts algorithm weights and fires a notification like "Platform Update: Shares are now more important for reach"
+- Momentum signal badge in PostDetailView: shows contextual hints based on viralStage — Stage 1: "Picking up traction", Stage 2: "Trending fast", Stage 3: "Exploding in reach", Stage 4: "🔥 Trending Worldwide"
+- Posts at viralStage 3-4 gain `isTrending: true` and appear at top of Trending page
 
 ### Modify
-
-- **Home feed**: Mix followed users' posts, trending posts, recommended posts, and simulated-user posts.
-- **Post Detail View**: Support carousel images, show full engagement details (views, reach, impressions, likes, comments, shares, followers gained, engagement rate), allow all interactions (like, comment, share, save). Navigate to commenter/author profiles.
-- **Engagement engine**: Wave-based simulation scaling with follower count. Likes 6–10%, comments 0.5–2%, shares 0.2–1% of viewers. Engagement score = likes + (comments×2) + (shares×3). Viral threshold triggers trending badge and reach boost. Follower gains driven by shares > comments > likes.
-- **Profile page**: Add Saved Posts tab, Followers/Following count as clickable links opening modals with lists and follow/unfollow actions.
-- **Explore page**: Add trending hashtags section alongside recommended posts.
-- **Analytics dashboard**: Ensure all 6 chart types present (follower growth, engagement trends, likes/post, comments/post, top post, engagement rate).
-- **Notifications**: Add events for all new triggers (achievements, boosts, follower gains from posts, viral alerts).
-- **Sidebar navigation**: Add Leaderboard route.
+- `AppContext.tsx`: add `viralStage` and `viralScore` to `PostItem` interface; initialize existing posts with `viralStage: 0, viralScore: 0`
+- `App.tsx`: import and call `useViralEngine()` in AppShell
+- `HomeFeed.tsx`: add `PostStrengthMeter` below the caption textarea, above the action buttons
+- `PostDetailView.tsx`: add momentum signal badge below the engagement stats grid, only shown when viralStage > 0
+- Trending page: sort by viralStage desc first, then engagementScore
 
 ### Remove
-
-- Nothing removed; all V2 features are preserved and extended.
+- Nothing removed
 
 ## Implementation Plan
-
-1. **Simulated user generator** (`utils/simulatedUsers.ts`): Deterministic seeded generator that produces user objects and posts on demand using an index. Used by feed and profile navigation without storing all users in state.
-
-2. **AppContext expansion**: Add savedPosts, followedUsers (Set of user IDs), stories, hashtag index, leaderboard data. Add actions: savePost, followUser, unfollowUser, addStory, addComment reply.
-
-3. **Story components**: `StoryBar.tsx` (horizontal scroll of story rings), `StoryViewer.tsx` (fullscreen viewer with tap nav, progress bar, viewer count, 24-min expiry timer).
-
-4. **Hashtag system**: Parse hashtags from post captions in PostCard. `HashtagPage.tsx` route showing posts with that tag. Trending hashtags in Explore.
-
-5. **PostCard upgrade**: Carousel swipe support (multiple images), save button, follow/unfollow button on avatar/username click, hashtag parsing.
-
-6. **Post Detail upgrade**: Full metrics panel, carousel, nested comment replies, profile navigation from username/avatar.
-
-7. **Profile page upgrade**: Saved Posts tab, clickable follower/following counts opening `FollowerListModal.tsx` and `FollowingListModal.tsx` with follow/unfollow actions and profile links.
-
-8. **Engagement engine rewrite** (`hooks/useEngagementSimulator.ts`): Wave-based phases, realistic percentage ranges, viral threshold detection, follower gain notifications.
-
-9. **Leaderboard page** (`pages/Leaderboard.tsx`): Ranked table of top 50 simulated + real users by follower count and engagement score.
-
-10. **Achievement expansion**: Add 15 achievement definitions, check triggers across all interaction handlers, show unlock toast/animation.
-
-11. **Routing**: Add `/leaderboard`, `/hashtag/:tag`, `/profile/:userId` routes in App.tsx.
-
-12. **Sidebar + MobileNav**: Add Leaderboard icon and link.
+1. Create `src/frontend/src/utils/viralEngine.ts`
+   - Export `ALGORITHM_WEIGHTS` object: `{ shares: 3, comments: 2, likes: 1, saves: 1.5 }` (mutable)
+   - Export `computeViralScore(post, weights)` function
+   - Export `VIRAL_STAGE_THRESHOLDS: [0, 500, 2000, 8000, 20000]`
+   - Export `getViralStage(score)` returning 0-4
+   - Export `getMomentumSignal(stage)` returning label string
+   - Export `ALGORITHM_UPDATE_EVENTS`: array of {message, weightChange} objects
+   - Export `computePostStrength(caption, hashtags)` returning 0-100 score
+2. Create `src/frontend/src/hooks/useViralEngine.ts`
+   - On interval (every 8-15s), iterate user's posts and advance viralStage if viralScore crosses threshold
+   - Fire notification when user post advances stage (momentum hints)
+   - On separate interval (every 3-5 min), pick random algorithm update, mutate ALGORITHM_WEIGHTS, fire platform announcement notification
+3. Add `PostStrengthMeter` inline in HomeFeed or as small component file
+4. Update AppContext PostItem type with viralStage/viralScore fields
+5. Update PostDetailView to show momentum badge when viralStage > 0
+6. Wire useViralEngine in App.tsx

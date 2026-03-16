@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   BarChart2,
   Compass,
+  DollarSign,
   Home,
   MessageCircle,
   TrendingUp,
@@ -32,6 +33,12 @@ const navItems = [
     icon: BarChart2,
     label: "Analytics",
     ocid: "nav.analytics.link",
+  },
+  {
+    id: "monetization",
+    icon: DollarSign,
+    label: "Monetization",
+    ocid: "nav.monetization.link",
   },
   {
     id: "leaderboard",
@@ -85,7 +92,11 @@ export default function Sidebar({ activePage, onNavigate }: Props) {
               key={id}
               data-ocid={ocid}
               onClick={() => onNavigate(id)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${isActive ? "text-white" : "text-muted-foreground hover:text-foreground hover:bg-white/5"}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${
+                isActive
+                  ? "text-white"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+              }`}
               style={
                 isActive
                   ? {

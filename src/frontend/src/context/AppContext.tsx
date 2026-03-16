@@ -6,6 +6,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { AI_CREATORS } from "../utils/aiInfluencers";
+import type { AICreator } from "../utils/aiInfluencers";
 import type { SimulatedPostData } from "../utils/simulatedUsers";
 
 export interface CommentReply {
@@ -50,6 +52,8 @@ export interface PostItem {
   likedByUser: boolean;
   savedByUser: boolean;
   isTrending: boolean;
+  viralStage?: number;
+  viralScore?: number;
 }
 
 export interface Story {
@@ -76,7 +80,23 @@ export interface NotificationItem {
     | "achievement"
     | "boost"
     | "dm"
-    | "follower_gain";
+    | "follower_gain"
+    | "tip"
+    | "sponsorship"
+    | "merch_sale"
+    | "collab_request"
+    | "collab_accepted";
+  collabId?: string;
+  collabCreatorId?: string;
+  collabCreatorName?: string;
+  collabCreatorAvatar?: string;
+}
+
+export interface CollabRequest {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorAvatar: string;
 }
 
 export interface Message {
@@ -104,6 +124,7 @@ export interface UserProfile {
   postsCount: number;
   xp: number;
   level: number;
+  niche: string;
 }
 
 export interface Achievement {
@@ -131,6 +152,36 @@ export interface Route {
   tag?: string;
 }
 
+export interface SponsorshipDeal {
+  id: string;
+  brandName: string;
+  dealValue: number;
+  tier: "small" | "ambassador" | "premium";
+  status: "active" | "pending";
+  acceptedAt?: number;
+}
+
+export interface MerchProduct {
+  id: string;
+  name: string;
+  price: number;
+  emoji: string;
+  totalSales: number;
+  totalRevenue: number;
+}
+
+export interface MonetizationData {
+  totalEarnings: number;
+  adRevenue: number;
+  tipRevenue: number;
+  merchRevenue: number;
+  sponsorRevenue: number;
+  dailyEarnings: number[];
+  monthlyEarnings: number[];
+  topEarningPosts: { postId: string; label: string; earnings: number }[];
+  activeSponsorships: SponsorshipDeal[];
+}
+
 interface AppContextType {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
@@ -150,6 +201,15 @@ interface AppContextType {
   setUnreadDMs: React.Dispatch<React.SetStateAction<number>>;
   analyticsData: AnalyticsData;
   setAnalyticsData: React.Dispatch<React.SetStateAction<AnalyticsData>>;
+  monetization: MonetizationData;
+  setMonetization: React.Dispatch<React.SetStateAction<MonetizationData>>;
+  merchProducts: MerchProduct[];
+  setMerchProducts: React.Dispatch<React.SetStateAction<MerchProduct[]>>;
+  addMerchSale: (productId: string) => void;
+  acceptSponsorship: (dealId: string) => void;
+  aiCreators: AICreator[];
+  pendingCollabs: CollabRequest[];
+  acceptCollab: (collabId: string) => void;
   boostFollowers: (amount: number) => void;
   savePost: (id: string) => void;
   unsavePost: (id: string) => void;
@@ -246,6 +306,8 @@ const INITIAL_POSTS: PostItem[] = [
     likedByUser: false,
     savedByUser: false,
     isTrending: true,
+    viralStage: 3,
+    viralScore: 5000,
   },
   {
     id: "p2",
@@ -271,6 +333,8 @@ const INITIAL_POSTS: PostItem[] = [
     likedByUser: false,
     savedByUser: false,
     isTrending: true,
+    viralStage: 2,
+    viralScore: 1500,
   },
   {
     id: "p3",
@@ -299,6 +363,8 @@ const INITIAL_POSTS: PostItem[] = [
     likedByUser: false,
     savedByUser: false,
     isTrending: false,
+    viralStage: 0,
+    viralScore: 0,
   },
   {
     id: "p4",
@@ -323,6 +389,8 @@ const INITIAL_POSTS: PostItem[] = [
     likedByUser: false,
     savedByUser: false,
     isTrending: false,
+    viralStage: 0,
+    viralScore: 0,
   },
   {
     id: "p5",
@@ -348,6 +416,8 @@ const INITIAL_POSTS: PostItem[] = [
     likedByUser: false,
     savedByUser: false,
     isTrending: false,
+    viralStage: 0,
+    viralScore: 0,
   },
   {
     id: "p6",
@@ -377,6 +447,8 @@ const INITIAL_POSTS: PostItem[] = [
     likedByUser: false,
     savedByUser: false,
     isTrending: true,
+    viralStage: 4,
+    viralScore: 15000,
   },
 ];
 
@@ -576,6 +648,73 @@ const INITIAL_STORIES: Story[] = [
   },
 ];
 
+const buildDailyEarnings = (): number[] => {
+  const base = [
+    22, 28, 31, 25, 34, 38, 29, 42, 36, 44, 38, 47, 41, 35, 50, 46, 52, 48, 55,
+    43, 58, 61, 54, 66, 59, 63, 68, 72, 65, 78,
+  ];
+  return base;
+};
+
+const buildMonthlyEarnings = (): number[] => [
+  210, 265, 298, 312, 380, 425, 390, 468, 510, 545, 620, 720,
+];
+
+const INITIAL_MONETIZATION: MonetizationData = {
+  totalEarnings: 1240.5,
+  adRevenue: 820.0,
+  tipRevenue: 245.5,
+  merchRevenue: 175.0,
+  sponsorRevenue: 0,
+  dailyEarnings: buildDailyEarnings(),
+  monthlyEarnings: buildMonthlyEarnings(),
+  topEarningPosts: [
+    {
+      postId: "p6",
+      label: "New drop is live ✨ Whic",
+      earnings: (12400 * 7) / 1000,
+    },
+    {
+      postId: "p1",
+      label: "Golden hour at Santorini",
+      earnings: (5820 * 7) / 1000,
+    },
+    {
+      postId: "p2",
+      label: "Late night city lights al",
+      earnings: (3910 * 7) / 1000,
+    },
+  ],
+  activeSponsorships: [],
+};
+
+const INITIAL_MERCH: MerchProduct[] = [
+  {
+    id: "m1",
+    name: "MindForge Hoodie",
+    price: 49.99,
+    emoji: "👕",
+    totalSales: 12,
+    totalRevenue: 599.88,
+  },
+  {
+    id: "m2",
+    name: "Creator Cap",
+    price: 24.99,
+    emoji: "🧢",
+    totalSales: 8,
+    totalRevenue: 199.92,
+  },
+  {
+    id: "m3",
+    name: "Digital Creator Pack",
+    price: 9.99,
+    emoji: "💾",
+    totalSales: 23,
+    totalRevenue: 229.77,
+  },
+];
+
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -589,6 +728,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     postsCount: 5,
     xp: 2400,
     level: 3,
+    niche: "Tech",
   });
   const [posts, setPosts] = useState<PostItem[]>(INITIAL_POSTS);
   const postsRef = useRef<PostItem[]>(INITIAL_POSTS);
@@ -641,6 +781,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })),
     topPostId: "p1",
   });
+  const [monetization, setMonetization] =
+    useState<MonetizationData>(INITIAL_MONETIZATION);
+  const [merchProducts, setMerchProducts] =
+    useState<MerchProduct[]>(INITIAL_MERCH);
   const [currentRoute, setCurrentRoute] = useState<Route>({ page: "home" });
   const notifIdRef = useRef(10);
 
@@ -650,6 +794,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addNotification = useCallback(
     (notif: Omit<NotificationItem, "id" | "timestamp">) => {
+      if (
+        notif.type === "collab_request" &&
+        notif.collabId &&
+        notif.collabCreatorId &&
+        notif.collabCreatorName &&
+        notif.collabCreatorAvatar
+      ) {
+        setPendingCollabs((prev) => [
+          ...prev,
+          {
+            id: notif.collabId as string,
+            creatorId: notif.collabCreatorId as string,
+            creatorName: notif.collabCreatorName as string,
+            creatorAvatar: notif.collabCreatorAvatar as string,
+          },
+        ]);
+      }
       const newNotif: NotificationItem = {
         ...notif,
         id: `n-${notifIdRef.current++}`,
@@ -658,6 +819,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
     },
     [],
+  );
+
+  const addMerchSale = useCallback(
+    (productId: string) => {
+      setMerchProducts((prev) =>
+        prev.map((p) =>
+          p.id === productId
+            ? {
+                ...p,
+                totalSales: p.totalSales + 1,
+                totalRevenue: p.totalRevenue + p.price,
+              }
+            : p,
+        ),
+      );
+      const product = merchProducts.find((p) => p.id === productId);
+      if (product) {
+        setMonetization((prev) => ({
+          ...prev,
+          merchRevenue: prev.merchRevenue + product.price,
+          totalEarnings: prev.totalEarnings + product.price,
+          dailyEarnings: prev.dailyEarnings.map((v, i) =>
+            i === prev.dailyEarnings.length - 1 ? v + product.price : v,
+          ),
+        }));
+        addNotification({
+          icon: "🛍️",
+          message: `Someone bought your ${product.name} for $${product.price}! 🎉`,
+          type: "merch_sale",
+        });
+      }
+    },
+    [merchProducts, addNotification],
+  );
+
+  const acceptSponsorship = useCallback(
+    (dealId: string) => {
+      setMonetization((prev) => {
+        const deal = prev.activeSponsorships.find((d) => d.id === dealId);
+        if (!deal) return prev;
+        addNotification({
+          icon: "🤝",
+          message: `You accepted the ${deal.brandName} sponsorship deal for $${deal.dealValue.toLocaleString()}!`,
+          type: "sponsorship",
+        });
+        return {
+          ...prev,
+          sponsorRevenue: prev.sponsorRevenue + deal.dealValue,
+          totalEarnings: prev.totalEarnings + deal.dealValue,
+          activeSponsorships: prev.activeSponsorships.map((d) =>
+            d.id === dealId
+              ? { ...d, status: "active" as const, acceptedAt: Date.now() }
+              : d,
+          ),
+        };
+      });
+    },
+    [addNotification],
   );
 
   const savePost = useCallback((id: string) => {
@@ -758,7 +977,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  // Stable addSimulatedPost using ref — no posts dependency to avoid infinite loops
+  const [pendingCollabs, setPendingCollabs] = useState<CollabRequest[]>([]);
+
+  const acceptCollab = useCallback(
+    (collabId: string) => {
+      const collab = pendingCollabs.find((c) => c.id === collabId);
+      if (!collab) return;
+      const creator = AI_CREATORS.find((c) => c.id === collab.creatorId);
+      if (!creator) return;
+      const combinedReach = Math.floor(
+        (profile.followers + creator.followerCount) / 10,
+      );
+      const imgSeed = Date.now() % 1000;
+      const imageUrl = `https://picsum.photos/seed/${imgSeed}/600/600`;
+      const newPost: PostItem = {
+        id: `collab-${collabId}`,
+        authorName: `${profile.name} & ${creator.name}`,
+        authorUsername: "@collab",
+        authorUserId: creator.id,
+        authorAvatar: creator.avatar,
+        imageUrl,
+        images: [imageUrl],
+        caption: `🤝 Collab post with ${creator.name}! Two creators, one incredible post. #collab #creators`,
+        hashtags: ["#collab", "#creators"],
+        likes: Math.floor(combinedReach * 0.08),
+        comments: [],
+        shares: Math.floor(combinedReach * 0.02),
+        saves: Math.floor(combinedReach * 0.01),
+        views: combinedReach * 2,
+        reach: combinedReach,
+        impressions: combinedReach * 3,
+        followersGained: Math.floor(combinedReach * 0.005),
+        timestamp: Date.now(),
+        engagementScore: Math.floor(combinedReach * 0.1),
+        likedByUser: false,
+        savedByUser: false,
+        isTrending: true,
+      };
+      setPosts((prev) => [newPost, ...prev]);
+      setPendingCollabs((prev) => prev.filter((c) => c.id !== collabId));
+      addNotification({
+        icon: "🚀",
+        message: `Collab post with ${creator.name} is live! Combined reach: ${Math.floor(combinedReach / 1000)}K`,
+        type: "collab_accepted",
+      });
+    },
+    [pendingCollabs, profile, addNotification],
+  );
+
   const addSimulatedPost = useCallback((sp: SimulatedPostData): PostItem => {
     const existing = postsRef.current.find((p) => p.id === sp.id);
     if (existing) return existing;
@@ -787,6 +1053,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       likedByUser: false,
       savedByUser: false,
       isTrending: sp.isTrending,
+      viralStage: 0,
+      viralScore: 0,
     };
     setPosts((prev) => {
       if (prev.find((p) => p.id === sp.id)) return prev;
@@ -843,6 +1111,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUnreadDMs,
         analyticsData,
         setAnalyticsData,
+        monetization,
+        setMonetization,
+        merchProducts,
+        setMerchProducts,
+        addMerchSale,
+        acceptSponsorship,
+        aiCreators: AI_CREATORS,
+        pendingCollabs,
+        acceptCollab,
         boostFollowers,
         savePost,
         unsavePost,

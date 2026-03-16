@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bell } from "lucide-react";
 import { useApp } from "../context/AppContext";
@@ -13,7 +14,7 @@ function timeAgo(ts: number): string {
 }
 
 export default function NotificationsSidebar() {
-  const { notifications } = useApp();
+  const { notifications, acceptCollab } = useApp();
 
   return (
     <aside
@@ -39,17 +40,37 @@ export default function NotificationsSidebar() {
             <div
               key={notif.id}
               data-ocid={idx === 0 ? "notifications.item.1" : undefined}
-              className="glass-card-light p-3 flex gap-3 items-start notification-enter"
+              className="glass-card-light p-3 flex flex-col gap-2 notification-enter"
             >
-              <span className="text-lg leading-none mt-0.5">{notif.icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-foreground leading-relaxed">
-                  {notif.message}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {timeAgo(notif.timestamp)}
-                </p>
+              <div className="flex gap-3 items-start">
+                <span className="text-lg leading-none mt-0.5">
+                  {notif.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-foreground leading-relaxed">
+                    {notif.message}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {timeAgo(notif.timestamp)}
+                  </p>
+                </div>
               </div>
+              {notif.type === "collab_request" && notif.collabId && (
+                <Button
+                  data-ocid="notifications.confirm_button"
+                  size="sm"
+                  className="w-full text-xs h-7"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.6 0.22 280), oklch(0.55 0.25 300))",
+                    color: "white",
+                    border: "none",
+                  }}
+                  onClick={() => acceptCollab(notif.collabId as string)}
+                >
+                  🤝 Accept Collab
+                </Button>
+              )}
             </div>
           ))}
         </div>

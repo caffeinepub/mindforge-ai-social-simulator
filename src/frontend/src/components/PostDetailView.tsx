@@ -19,6 +19,7 @@ import {
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import type { PostItem } from "../context/AppContext";
+import { getMomentumSignal } from "../utils/viralEngine";
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
@@ -337,6 +338,31 @@ export default function PostDetailView({
                   </div>
                 ))}
               </div>
+              {(post.viralStage ?? 0) > 0 &&
+                (() => {
+                  const signal = getMomentumSignal(post.viralStage ?? 0);
+                  if (!signal) return null;
+                  const isHot = (post.viralStage ?? 0) >= 3;
+                  return (
+                    <div
+                      className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mx-auto w-fit"
+                      style={{
+                        background: isHot
+                          ? "linear-gradient(135deg, oklch(0.65 0.2 50 / 0.3), oklch(0.6 0.22 25 / 0.3))"
+                          : "oklch(0.22 0.03 280 / 0.6)",
+                        border: isHot
+                          ? "1px solid oklch(0.65 0.2 50 / 0.5)"
+                          : "1px solid oklch(0.35 0.03 280 / 0.4)",
+                        color: isHot
+                          ? "oklch(0.82 0.18 65)"
+                          : "oklch(0.7 0.2 295)",
+                      }}
+                    >
+                      <span>{isHot ? "U0001F525" : "U0001F4C8"}</span>
+                      <span>{signal}</span>
+                    </div>
+                  );
+                })()}
             </div>
 
             <ScrollArea className="flex-1 p-4">
