@@ -10,13 +10,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit2, Grid, Upload, Zap } from "lucide-react";
+import {
+  Bookmark,
+  Edit2,
+  Grid,
+  Upload,
+  UserCheck,
+  UserPlus,
+  Users,
+  Zap,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import FollowersModal from "../components/FollowersModal";
+import FollowingModal from "../components/FollowingModal";
 import PostDetailView from "../components/PostDetailView";
 import { PRESET_AVATARS, useApp } from "../context/AppContext";
 import type { PostItem } from "../context/AppContext";
+import { generatePostsForUser, generateUser } from "../utils/simulatedUsers";
 
 const LEVEL_THRESHOLDS = [
   { level: 1, name: "Beginner Creator", min: 0, max: 500 },
@@ -40,18 +54,46 @@ function getLevelInfo(xp: number) {
   return { ...LEVEL_THRESHOLDS[0], progress: 0, nextXp: 500 };
 }
 
-export default function Profile() {
+interface Props {
+  userId?: string;
+}
+
+export default function Profile({ userId }: Props) {
   const {
     profile,
     setProfile,
     posts,
     achievements,
-    setAchievements,
     boostFollowers,
+    savedPosts,
+    followedUserIds,
+    followUser,
+    unfollowUser,
+    addSimulatedPost,
   } = useApp();
+  const isOwnProfile = !userId;
+
+  const [simPosts, setSimPosts] = useState<PostItem[]>([]);
+  const [simLoading, setSimLoading] = useState(false);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: addSimulatedPost is stable, userId drives re-runs
+  useEffect(() => {
+    if (!userId) return;
+    setSimLoading(true);
+    const userIndex = Number.parseInt(userId) || 0;
+    const generated = generatePostsForUser(userIndex, 9);
+    const converted = generated.map((sp) => addSimulatedPost(sp));
+    setSimPosts(converted);
+    setTimeout(() => setSimLoading(false), 800);
+  }, [userId]);
+
+  const simUser = userId ? generateUser(Number.parseInt(userId) || 0) : null;
+
   const [editOpen, setEditOpen] = useState(false);
   const [boostOpen, setBoostOpen] = useState(false);
   const [detailPost, setDetailPost] = useState<PostItem | null>(null);
+  const [followersOpen, setFollowersOpen] = useState(false);
+  const [followingOpen, setFollowingOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     name: profile.name,
     username: profile.username,
@@ -64,10 +106,31 @@ export default function Profile() {
   const avatarFileRef = useRef<HTMLInputElement>(null);
   const prevAchievementsRef = useRef(achievements);
 
-  const levelInfo = getLevelInfo(profile.xp);
-  const userPosts = posts.filter((p) => p.authorUsername === profile.username);
+  const displayProfile = isOwnProfile
+    ? profile
+    : simUser
+      ? {
+          name: simUser.displayName,
+          username: simUser.username,
+          avatar: simUser.avatar,
+          bio: simUser.bio,
+          followers: simUser.followerCount,
+          following: simUser.followingCount,
+          postsCount: simUser.postsCount,
+          xp: simUser.creatorLevel * 500,
+          level: simUser.creatorLevel,
+        }
+      : profile;
 
-  // Milestone celebration on achievement unlock
+  const userPosts = isOwnProfile
+    ? posts.filter((p) => p.authorUsername === profile.username)
+    : simPosts;
+  const savedPostsList = isOwnProfile
+    ? posts.filter((p) => savedPosts.has(p.id) || p.savedByUser)
+    : [];
+  const levelInfo = getLevelInfo(displayProfile.xp);
+  const isFollowingUser = userId ? followedUserIds.has(userId) : false;
+
   useEffect(() => {
     const prev = prevAchievementsRef.current;
     for (const ach of achievements) {
@@ -77,19 +140,18 @@ export default function Profile() {
           <div className="flex items-center gap-3">
             <span className="text-3xl">{ach.icon}</span>
             <div>
-              <p className="font-bold text-sm">🏆 Achievement Unlocked!</p>
+              <p className="font-bold text-sm">
+                \ud83c\udfc6 Achievement Unlocked!
+              </p>
               <p className="text-xs text-muted-foreground">{ach.title}</p>
             </div>
           </div>,
           { duration: 5000 },
         );
-        setAchievements((prev) =>
-          prev.map((a) => (a.id === ach.id ? { ...a, unlocked: true } : a)),
-        );
       }
     }
     prevAchievementsRef.current = achievements;
-  }, [achievements, setAchievements]);
+  }, [achievements]);
 
   const handleSave = () => {
     setProfile((prev) => ({ ...prev, ...editForm }));
@@ -109,10 +171,27 @@ export default function Profile() {
   const handleBoost = (amount: number) => {
     boostFollowers(amount);
     toast.success(
-      `🚀 Boost activated! +${amount.toLocaleString()} followers incoming!`,
+      `\ud83d\ude80 Boost activated! +${amount.toLocaleString()} followers incoming!`,
     );
     setBoostOpen(false);
   };
+
+  const openPostsForDetail = isOwnProfile ? userPosts : simPosts;
+
+  if (!isOwnProfile && simLoading) {
+    return (
+      <div className="max-w-2xl mx-auto py-6 px-4 space-y-4">
+        <Skeleton className="h-48 rounded-2xl" />
+        <Skeleton className="h-24 rounded-2xl" />
+        <div className="grid grid-cols-3 gap-2">
+          {Array.from({ length: 9 }).map((_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton items have no id
+            <Skeleton key={i} className="aspect-square rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
@@ -123,47 +202,91 @@ export default function Profile() {
             className="w-24 h-24"
             style={{ boxShadow: "0 0 0 4px oklch(0.6 0.22 295 / 0.3)" }}
           >
-            <AvatarImage src={profile.avatar} alt={profile.name} />
+            <AvatarImage
+              src={displayProfile.avatar}
+              alt={displayProfile.name}
+            />
             <AvatarFallback className="text-2xl">
-              {profile.name[0]}
+              {displayProfile.name[0]}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">{profile.name}</h1>
+            <h1 className="text-2xl font-bold">{displayProfile.name}</h1>
             <p className="text-muted-foreground text-sm mb-2">
-              {profile.username}
+              {displayProfile.username}
             </p>
-            <p className="text-sm text-foreground mb-4">{profile.bio}</p>
+            <p className="text-sm text-foreground mb-4">{displayProfile.bio}</p>
             <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                data-ocid="profile.edit_button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                style={{
-                  borderColor: "oklch(0.35 0.03 280 / 0.5)",
-                  background: "oklch(0.2 0.02 280 / 0.5)",
-                }}
-                onClick={() => {
-                  setEditForm({
-                    name: profile.name,
-                    username: profile.username,
-                    bio: profile.bio,
-                    avatar: profile.avatar,
-                  });
-                  setEditOpen(true);
-                }}
-              >
-                <Edit2 className="w-3.5 h-3.5" /> Edit Profile
-              </Button>
-              <Button
-                data-ocid="profile.boost_open_button"
-                size="sm"
-                className="gap-2 btn-gradient text-white border-none boost-pulse"
-                onClick={() => setBoostOpen(true)}
-              >
-                <Zap className="w-3.5 h-3.5" /> Boost Followers
-              </Button>
+              {isOwnProfile ? (
+                <>
+                  <Button
+                    data-ocid="profile.edit.button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    style={{
+                      borderColor: "oklch(0.35 0.03 280 / 0.5)",
+                      background: "oklch(0.2 0.02 280 / 0.5)",
+                    }}
+                    onClick={() => {
+                      setEditForm({
+                        name: profile.name,
+                        username: profile.username,
+                        bio: profile.bio,
+                        avatar: profile.avatar,
+                      });
+                      setEditOpen(true);
+                    }}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" /> Edit Profile
+                  </Button>
+                  <Button
+                    data-ocid="profile.boost.open_modal_button"
+                    size="sm"
+                    className="gap-2 btn-gradient text-white border-none boost-pulse"
+                    onClick={() => setBoostOpen(true)}
+                  >
+                    <Zap className="w-3.5 h-3.5" /> Boost Followers
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  data-ocid={
+                    isFollowingUser
+                      ? "profile.unfollow.button"
+                      : "profile.follow.button"
+                  }
+                  size="sm"
+                  className={
+                    isFollowingUser ? "" : "btn-gradient text-white border-none"
+                  }
+                  variant={isFollowingUser ? "outline" : "default"}
+                  style={
+                    isFollowingUser
+                      ? { borderColor: "oklch(0.35 0.03 280 / 0.5)" }
+                      : {}
+                  }
+                  onClick={() =>
+                    userId
+                      ? isFollowingUser
+                        ? unfollowUser(userId)
+                        : followUser(userId)
+                      : undefined
+                  }
+                >
+                  {isFollowingUser ? (
+                    <>
+                      <UserCheck className="w-3.5 h-3.5 mr-1" />
+                      Following
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-3.5 h-3.5 mr-1" />
+                      Follow
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -172,16 +295,36 @@ export default function Profile() {
           className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t"
           style={{ borderColor: "oklch(0.25 0.025 280 / 0.3)" }}
         >
-          {[
-            { label: "Posts", value: userPosts.length },
-            { label: "Followers", value: profile.followers.toLocaleString() },
-            { label: "Following", value: profile.following },
-          ].map(({ label, value }) => (
-            <div key={label} className="text-center">
-              <p className="text-2xl font-bold">{value}</p>
-              <p className="text-xs text-muted-foreground">{label}</p>
-            </div>
-          ))}
+          <div className="text-center">
+            <p className="text-2xl font-bold">
+              {userPosts.length || displayProfile.postsCount}
+            </p>
+            <p className="text-xs text-muted-foreground">Posts</p>
+          </div>
+          <button
+            type="button"
+            data-ocid="profile.followers.link"
+            className="text-center hover:opacity-70 transition-opacity"
+            onClick={() => setFollowersOpen(true)}
+          >
+            <p className="text-2xl font-bold">
+              {displayProfile.followers.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground">Followers</p>
+          </button>
+          <button
+            type="button"
+            data-ocid="profile.following.link"
+            className="text-center hover:opacity-70 transition-opacity"
+            onClick={() => {
+              if (isOwnProfile) setFollowingOpen(true);
+            }}
+          >
+            <p className="text-2xl font-bold">
+              {displayProfile.following.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground">Following</p>
+          </button>
         </div>
       </div>
 
@@ -196,12 +339,12 @@ export default function Profile() {
               className="font-bold text-lg"
               style={{ color: "oklch(0.75 0.22 295)" }}
             >
-              Lv.{levelInfo.level} — {levelInfo.name}
+              Lv.{levelInfo.level} \u2014 {levelInfo.name}
             </p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold">
-              {profile.xp.toLocaleString()} XP
+              {displayProfile.xp.toLocaleString()} XP
             </p>
             <p className="text-xs text-muted-foreground">
               Next: {levelInfo.nextXp.toLocaleString()} XP
@@ -216,79 +359,173 @@ export default function Profile() {
       </div>
 
       {/* Achievements */}
-      <div className="glass-card p-5">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
-          🏆 Achievements
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {achievements.map((ach, idx) => (
-            <div
-              key={ach.id}
-              data-ocid={`achievements.item.${idx + 1}`}
-              className={`glass-card-light p-3 text-center transition-all duration-300 ${
-                ach.unlocked
-                  ? "ring-1 ring-purple-500/30"
-                  : "opacity-40 grayscale"
-              }`}
-            >
-              <div className="text-3xl mb-2">{ach.icon}</div>
-              <p className="text-xs font-semibold text-foreground leading-tight">
-                {ach.title}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 leading-tight">
-                {ach.description}
-              </p>
-              {ach.unlocked && (
-                <div
-                  className="mt-2 text-xs"
-                  style={{ color: "oklch(0.65 0.2 175)" }}
-                >
-                  ✓ Unlocked
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Posts Grid */}
-      <div className="glass-card p-5">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
-          <Grid className="w-4 h-4" /> Posts
-        </h2>
-        {userPosts.length === 0 ? (
-          <p
-            data-ocid="profile.posts.empty_state"
-            className="text-muted-foreground text-sm text-center py-4"
-          >
-            No posts yet
-          </p>
-        ) : (
-          <div className="grid grid-cols-3 gap-2">
-            {userPosts.map((post, idx) => (
-              <button
-                type="button"
-                key={post.id}
-                data-ocid={`profile.posts.item.${idx + 1}`}
-                onClick={() => setDetailPost(post)}
-                className="aspect-square rounded-xl overflow-hidden group"
+      {isOwnProfile && (
+        <div className="glass-card p-5">
+          <h2 className="font-semibold mb-4 flex items-center gap-2">
+            \ud83c\udfc6 Achievements
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {achievements.map((ach, idx) => (
+              <div
+                key={ach.id}
+                data-ocid={`achievements.item.${idx + 1}`}
+                className={`glass-card-light p-3 text-center transition-all duration-300 ${ach.unlocked ? "ring-1 ring-purple-500/30" : "opacity-40 grayscale"}`}
               >
-                <img
-                  src={post.imageUrl}
-                  alt=""
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                />
-              </button>
+                <div className="text-3xl mb-2">{ach.icon}</div>
+                <p className="text-xs font-semibold text-foreground leading-tight">
+                  {ach.title}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 leading-tight">
+                  {ach.description}
+                </p>
+                {ach.unlocked && (
+                  <div
+                    className="mt-2 text-xs"
+                    style={{ color: "oklch(0.65 0.2 175)" }}
+                  >
+                    \u2713 Unlocked
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Post Detail View */}
+      {/* Posts / Saved Tabs */}
+      <Tabs defaultValue="posts">
+        <TabsList
+          className="w-full"
+          style={{ background: "oklch(0.16 0.018 280)" }}
+        >
+          <TabsTrigger
+            value="posts"
+            data-ocid="profile.posts.tab"
+            className="flex-1 gap-1.5"
+          >
+            <Grid className="w-3.5 h-3.5" /> Posts
+          </TabsTrigger>
+          {isOwnProfile && (
+            <TabsTrigger
+              value="saved"
+              data-ocid="profile.saved.tab"
+              className="flex-1 gap-1.5"
+            >
+              <Bookmark className="w-3.5 h-3.5" /> Saved
+            </TabsTrigger>
+          )}
+          {!isOwnProfile && (
+            <TabsTrigger
+              value="followers"
+              data-ocid="profile.followers.tab"
+              className="flex-1 gap-1.5"
+            >
+              <Users className="w-3.5 h-3.5" /> Followers
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="posts">
+          {userPosts.length === 0 ? (
+            <p
+              data-ocid="profile.posts.empty_state"
+              className="text-muted-foreground text-sm text-center py-8"
+            >
+              No posts yet
+            </p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 mt-4">
+              {userPosts.map((post, idx) => (
+                <button
+                  type="button"
+                  key={post.id}
+                  data-ocid={`profile.posts.item.${idx + 1}`}
+                  onClick={() => setDetailPost(post)}
+                  className="aspect-square rounded-xl overflow-hidden group relative"
+                >
+                  <img
+                    src={post.imageUrl}
+                    alt=""
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  />
+                  {post.images && post.images.length > 1 && (
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded bg-black/60 flex items-center justify-center">
+                      <span className="text-white text-xs">
+                        {post.images.length}
+                      </span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {isOwnProfile && (
+          <TabsContent value="saved">
+            {savedPostsList.length === 0 ? (
+              <p
+                data-ocid="profile.saved.empty_state"
+                className="text-muted-foreground text-sm text-center py-8"
+              >
+                No saved posts yet
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                {savedPostsList.map((post, idx) => (
+                  <button
+                    type="button"
+                    key={post.id}
+                    data-ocid={`profile.saved.item.${idx + 1}`}
+                    onClick={() => setDetailPost(post)}
+                    className="aspect-square rounded-xl overflow-hidden group"
+                  >
+                    <img
+                      src={post.imageUrl}
+                      alt=""
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        )}
+
+        {!isOwnProfile && (
+          <TabsContent value="followers">
+            <div className="mt-4 text-center text-muted-foreground text-sm py-4">
+              <button
+                type="button"
+                className="underline hover:text-foreground transition-colors"
+                onClick={() => setFollowersOpen(true)}
+              >
+                View {displayProfile.followers.toLocaleString()} followers
+              </button>
+            </div>
+          </TabsContent>
+        )}
+      </Tabs>
+
+      <FollowersModal
+        open={followersOpen}
+        onClose={() => setFollowersOpen(false)}
+        followerCount={displayProfile.followers}
+        isOwnProfile={isOwnProfile}
+      />
+      {isOwnProfile && (
+        <FollowingModal
+          open={followingOpen}
+          onClose={() => setFollowingOpen(false)}
+        />
+      )}
+
       {detailPost && (
         <PostDetailView
-          post={posts.find((p) => p.id === detailPost.id) ?? detailPost}
-          posts={userPosts}
+          post={
+            openPostsForDetail.find((p) => p.id === detailPost.id) ?? detailPost
+          }
+          posts={openPostsForDetail}
           onClose={() => setDetailPost(null)}
           onNavigate={setDetailPost}
         />
@@ -305,8 +542,7 @@ export default function Profile() {
         >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-yellow-400" />
-              Boost Followers
+              <Zap className="w-5 h-5 text-yellow-400" /> Boost Followers
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
@@ -317,30 +553,30 @@ export default function Profile() {
               {
                 label: "MIN Boost",
                 amount: 1000,
-                icon: "⚡",
+                icon: "\u26a1",
                 desc: "Great for kickstarting growth",
                 gradient:
                   "linear-gradient(135deg, oklch(0.55 0.2 240), oklch(0.5 0.22 210))",
-                ocid: "profile.boost.min_button",
+                ocid: "boost.min.button",
               },
               {
                 label: "MEDIUM Boost",
                 amount: 10000,
-                icon: "🔥",
+                icon: "\ud83d\udd25",
                 desc: "Most popular choice",
                 gradient:
                   "linear-gradient(135deg, oklch(0.55 0.25 295), oklch(0.55 0.22 240))",
                 badge: "Most Popular",
-                ocid: "profile.boost.medium_button",
+                ocid: "boost.medium.button",
               },
               {
                 label: "MAX Boost",
                 amount: 100000,
-                icon: "🚀",
+                icon: "\ud83d\ude80",
                 desc: "Go viral instantly",
                 gradient:
                   "linear-gradient(135deg, oklch(0.7 0.2 80), oklch(0.65 0.2 50))",
-                ocid: "profile.boost.max_button",
+                ocid: "boost.max.button",
               },
             ].map(({ label, amount, icon, desc, gradient, badge, ocid }) => (
               <button
@@ -348,7 +584,7 @@ export default function Profile() {
                 key={label}
                 data-ocid={ocid}
                 onClick={() => handleBoost(amount)}
-                className="relative flex items-center gap-4 p-4 rounded-xl text-white text-left hover:opacity-90 active:scale-98 transition-all duration-150"
+                className="relative flex items-center gap-4 p-4 rounded-xl text-white text-left hover:opacity-90 transition-all duration-150"
                 style={{ background: gradient }}
               >
                 <span className="text-3xl">{icon}</span>
@@ -430,8 +666,6 @@ export default function Profile() {
                 rows={2}
               />
             </div>
-
-            {/* Avatar Options */}
             <div>
               <Label className="text-sm text-muted-foreground">
                 Profile Picture
@@ -442,23 +676,15 @@ export default function Profile() {
                   <AvatarFallback>{editForm.name[0]}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col gap-1.5">
-                  {[
-                    { id: "url" as const, label: "URL" },
-                    { id: "upload" as const, label: "Upload" },
-                    { id: "preset" as const, label: "Presets" },
-                  ].map((tab) => (
+                  {(["url", "upload", "preset"] as const).map((tab) => (
                     <button
                       type="button"
-                      key={tab.id}
-                      data-ocid={`profile.edit.avatar_${tab.id}_tab`}
-                      onClick={() => setAvatarTab(tab.id)}
-                      className={`text-xs px-3 py-1 rounded-full transition-colors ${
-                        avatarTab === tab.id
-                          ? "text-white"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
+                      key={tab}
+                      data-ocid={`profile.edit.avatar_${tab}.tab`}
+                      onClick={() => setAvatarTab(tab)}
+                      className={`text-xs px-3 py-1 rounded-full transition-colors ${avatarTab === tab ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
                       style={
-                        avatarTab === tab.id
+                        avatarTab === tab
                           ? {
                               background:
                                 "linear-gradient(135deg, oklch(0.55 0.25 295), oklch(0.55 0.22 240))",
@@ -466,15 +692,14 @@ export default function Profile() {
                           : {}
                       }
                     >
-                      {tab.label}
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
                   ))}
                 </div>
               </div>
-
               {avatarTab === "url" && (
                 <Input
-                  data-ocid="profile.edit.avatar_url_input"
+                  data-ocid="profile.edit.avatar_url.input"
                   placeholder="https://..."
                   value={
                     editForm.avatar.startsWith("data:") ? "" : editForm.avatar
@@ -484,7 +709,6 @@ export default function Profile() {
                   }
                 />
               )}
-
               {avatarTab === "upload" && (
                 <div>
                   <input
@@ -495,7 +719,7 @@ export default function Profile() {
                     onChange={handleAvatarUpload}
                   />
                   <Button
-                    data-ocid="profile.edit.avatar_upload_button"
+                    data-ocid="profile.edit.avatar_upload.button"
                     variant="outline"
                     className="w-full gap-2"
                     style={{ borderColor: "oklch(0.35 0.03 280 / 0.5)" }}
@@ -505,7 +729,6 @@ export default function Profile() {
                   </Button>
                 </div>
               )}
-
               {avatarTab === "preset" && (
                 <div className="grid grid-cols-5 gap-2">
                   {PRESET_AVATARS.map((p, i) => (
@@ -522,11 +745,7 @@ export default function Profile() {
                       className="flex flex-col items-center gap-1 group"
                     >
                       <Avatar
-                        className={`w-10 h-10 transition-all duration-150 ${
-                          editForm.avatar.includes(p.seed)
-                            ? "ring-2 ring-purple-400 scale-110"
-                            : "group-hover:scale-105"
-                        }`}
+                        className={`w-10 h-10 transition-all duration-150 ${editForm.avatar.includes(p.seed) ? "ring-2 ring-purple-400 scale-110" : "group-hover:scale-105"}`}
                       >
                         <AvatarImage
                           src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${p.seed}`}
@@ -544,14 +763,14 @@ export default function Profile() {
           </div>
           <DialogFooter>
             <Button
-              data-ocid="profile.cancel_button"
+              data-ocid="profile.edit.cancel_button"
               variant="ghost"
               onClick={() => setEditOpen(false)}
             >
               Cancel
             </Button>
             <Button
-              data-ocid="profile.save_button"
+              data-ocid="profile.edit.save_button"
               className="btn-gradient text-white border-none"
               onClick={handleSave}
             >

@@ -1,23 +1,25 @@
 import { Toaster } from "@/components/ui/sonner";
-import { useState } from "react";
 import MobileNav from "./components/MobileNav";
 import NotificationsSidebar from "./components/NotificationsSidebar";
 import Sidebar from "./components/Sidebar";
-import { AppProvider } from "./context/AppContext";
+import { AppProvider, useApp } from "./context/AppContext";
 import { useIsMobile } from "./hooks/use-mobile";
 import { useEngagementSimulator } from "./hooks/useEngagementSimulator";
 import Analytics from "./pages/Analytics";
 import Explore from "./pages/Explore";
+import HashtagPage from "./pages/HashtagPage";
 import HomeFeed from "./pages/HomeFeed";
+import Leaderboard from "./pages/Leaderboard";
 import Messages from "./pages/Messages";
 import Profile from "./pages/Profile";
 import Trending from "./pages/Trending";
 
 function AppShell() {
-  const [activePage, setActivePage] = useState("home");
+  const { currentRoute, navigate } = useApp();
   const isMobile = useIsMobile();
-
   useEngagementSimulator();
+
+  const activePage = currentRoute.page;
 
   const renderPage = () => {
     switch (activePage) {
@@ -33,17 +35,24 @@ function AppShell() {
         return <Profile />;
       case "analytics":
         return <Analytics />;
+      case "leaderboard":
+        return <Leaderboard />;
+      case "user-profile":
+        return <Profile userId={currentRoute.userId} />;
+      case "hashtag":
+        return <HashtagPage tag={currentRoute.tag ?? ""} />;
       default:
         return <HomeFeed />;
     }
   };
 
+  const handleNavigate = (page: string) => navigate(page);
+
   return (
     <div className="min-h-screen flex">
       {!isMobile && (
-        <Sidebar activePage={activePage} onNavigate={setActivePage} />
+        <Sidebar activePage={activePage} onNavigate={handleNavigate} />
       )}
-
       <main
         className="flex-1 overflow-y-auto"
         style={{
@@ -54,12 +63,10 @@ function AppShell() {
       >
         {renderPage()}
       </main>
-
       {!isMobile && <NotificationsSidebar />}
       {isMobile && (
-        <MobileNav activePage={activePage} onNavigate={setActivePage} />
+        <MobileNav activePage={activePage} onNavigate={handleNavigate} />
       )}
-
       <Toaster
         position="top-right"
         toastOptions={{

@@ -6,21 +6,37 @@ import {
   useRef,
   useState,
 } from "react";
+import type { SimulatedPostData } from "../utils/simulatedUsers";
+
+export interface CommentReply {
+  id: string;
+  username: string;
+  userId?: string;
+  avatar?: string;
+  text: string;
+  timestamp: number;
+}
 
 export interface CommentItem {
   id: string;
   username: string;
+  userId?: string;
+  avatar?: string;
   text: string;
   timestamp: number;
+  replies?: CommentReply[];
 }
 
 export interface PostItem {
   id: string;
   authorName: string;
   authorUsername: string;
+  authorUserId?: string;
   authorAvatar: string;
   imageUrl: string;
+  images?: string[];
   caption: string;
+  hashtags?: string[];
   likes: number;
   comments: CommentItem[];
   shares: number;
@@ -36,6 +52,17 @@ export interface PostItem {
   isTrending: boolean;
 }
 
+export interface Story {
+  id: string;
+  userId: string;
+  username: string;
+  avatar: string;
+  imageUrl: string;
+  createdAt: number;
+  viewCount: number;
+  viewed: boolean;
+}
+
 export interface NotificationItem {
   id: string;
   icon: string;
@@ -48,7 +75,8 @@ export interface NotificationItem {
     | "viral"
     | "achievement"
     | "boost"
-    | "dm";
+    | "dm"
+    | "follower_gain";
 }
 
 export interface Message {
@@ -66,7 +94,7 @@ export interface Conversation {
   messages: Message[];
 }
 
-export interface Profile {
+export interface UserProfile {
   name: string;
   username: string;
   avatar: string;
@@ -84,6 +112,7 @@ export interface Achievement {
   title: string;
   description: string;
   unlocked: boolean;
+  unlockedAt?: number;
 }
 
 export interface AnalyticsData {
@@ -96,11 +125,21 @@ export interface AnalyticsData {
   topPostId: string | null;
 }
 
+export interface Route {
+  page: string;
+  userId?: string;
+  tag?: string;
+}
+
 interface AppContextType {
-  profile: Profile;
-  setProfile: React.Dispatch<React.SetStateAction<Profile>>;
+  profile: UserProfile;
+  setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
   posts: PostItem[];
   setPosts: React.Dispatch<React.SetStateAction<PostItem[]>>;
+  savedPosts: Set<string>;
+  likedPosts: Set<string>;
+  followedUserIds: Set<string>;
+  stories: Story[];
   notifications: NotificationItem[];
   addNotification: (notif: Omit<NotificationItem, "id" | "timestamp">) => void;
   conversations: Conversation[];
@@ -112,19 +151,38 @@ interface AppContextType {
   analyticsData: AnalyticsData;
   setAnalyticsData: React.Dispatch<React.SetStateAction<AnalyticsData>>;
   boostFollowers: (amount: number) => void;
+  savePost: (id: string) => void;
+  unsavePost: (id: string) => void;
+  likePost: (id: string) => void;
+  unlikePost: (id: string) => void;
+  followUser: (userId: string) => void;
+  unfollowUser: (userId: string) => void;
+  addStory: (story: Story) => void;
+  addCommentReply: (
+    postId: string,
+    commentId: string,
+    reply: CommentReply,
+  ) => void;
+  addSimulatedPost: (post: SimulatedPostData) => PostItem;
+  currentRoute: Route;
+  navigate: (page: string, params?: Partial<Route>) => void;
 }
 
 export const SAMPLE_COMMENTS = [
   "Nice post!",
   "Amazing content!",
-  "Love this! ❤️",
-  "🔥🔥🔥",
+  "Love this! \u2764\ufe0f",
+  "\ud83d\udd25\ud83d\udd25\ud83d\udd25",
   "Keep posting!",
   "Absolutely stunning!",
   "This made my day!",
   "So inspiring!",
   "Incredible shot!",
-  "Goals! 🙌",
+  "Goals! \ud83d\ude4c",
+  "Need this in my life!",
+  "You're so talented!",
+  "Obsessed with this \ud83d\ude0d",
+  "More of this please!",
 ];
 
 export const SAMPLE_AVATARS = [
@@ -135,25 +193,29 @@ export const SAMPLE_AVATARS = [
 ];
 
 export const PRESET_AVATARS = [
-  { seed: "artist", label: "🎨 Artist" },
-  { seed: "gamer", label: "🎮 Gamer" },
-  { seed: "explorer", label: "🌍 Explorer" },
-  { seed: "creator", label: "✨ Creator" },
-  { seed: "athlete", label: "🏆 Athlete" },
-  { seed: "techie", label: "💻 Techie" },
-  { seed: "foodie", label: "🍕 Foodie" },
-  { seed: "musician", label: "🎵 Musician" },
-  { seed: "photographer", label: "📸 Photographer" },
-  { seed: "traveler", label: "✈️ Traveler" },
+  { seed: "artist", label: "\ud83c\udfa8 Artist" },
+  { seed: "gamer", label: "\ud83c\udfae Gamer" },
+  { seed: "explorer", label: "\ud83c\udf0d Explorer" },
+  { seed: "creator", label: "\u2728 Creator" },
+  { seed: "athlete", label: "\ud83c\udfc6 Athlete" },
+  { seed: "techie", label: "\ud83d\udcbb Techie" },
+  { seed: "foodie", label: "\ud83c\udf55 Foodie" },
+  { seed: "musician", label: "\ud83c\udfb5 Musician" },
+  { seed: "photographer", label: "\ud83d\udcf8 Photographer" },
+  { seed: "traveler", label: "\u2708\ufe0f Traveler" },
 ];
 
 const SAMPLE_USERS = ["@samchen", "@miatorres", "@jordankim", "@rileylee"];
+const SAMPLE_USER_IDS = ["1", "2", "3", "4"];
 
 const makeComment = (index: number): CommentItem => ({
   id: `c-${Date.now()}-${index}`,
   username: SAMPLE_USERS[index % 4],
+  userId: SAMPLE_USER_IDS[index % 4],
+  avatar: SAMPLE_AVATARS[index % 4],
   text: SAMPLE_COMMENTS[index % SAMPLE_COMMENTS.length],
   timestamp: Date.now() - (8 - index) * 60000,
+  replies: [],
 });
 
 const INITIAL_POSTS: PostItem[] = [
@@ -163,8 +225,14 @@ const INITIAL_POSTS: PostItem[] = [
     authorUsername: "@alexrivera",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alexrivera",
     imageUrl: "https://picsum.photos/seed/travel1/600/400",
+    images: [
+      "https://picsum.photos/seed/travel1/600/400",
+      "https://picsum.photos/seed/travel2/600/400",
+      "https://picsum.photos/seed/travel3/600/400",
+    ],
     caption:
-      "Golden hour at Santorini — nothing beats this view 🌅 #travel #wanderlust",
+      "Golden hour at Santorini \u2014 nothing beats this view \ud83c\udf05 #travel #wanderlust",
+    hashtags: ["#travel", "#wanderlust"],
     likes: 482,
     comments: [0, 1, 2, 3, 4].map(makeComment),
     shares: 34,
@@ -183,10 +251,13 @@ const INITIAL_POSTS: PostItem[] = [
     id: "p2",
     authorName: "Sam Chen",
     authorUsername: "@samchen",
+    authorUserId: "1",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sam",
     imageUrl: "https://picsum.photos/seed/city2/600/400",
+    images: ["https://picsum.photos/seed/city2/600/400"],
     caption:
-      "Late night city lights always hit different 🌆 #citylife #nightphotography",
+      "Late night city lights always hit different \ud83c\udf06 #citylife #nightphotography",
+    hashtags: ["#citylife", "#nightphotography"],
     likes: 317,
     comments: [1, 2, 3].map(makeComment),
     shares: 21,
@@ -205,10 +276,16 @@ const INITIAL_POSTS: PostItem[] = [
     id: "p3",
     authorName: "Mia Torres",
     authorUsername: "@miatorres",
+    authorUserId: "2",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=mia",
     imageUrl: "https://picsum.photos/seed/nature3/600/400",
+    images: [
+      "https://picsum.photos/seed/nature3/600/400",
+      "https://picsum.photos/seed/nature4/600/400",
+    ],
     caption:
-      "Morning hike to the summit 🏔️ The struggle is always worth it #hiking #nature",
+      "Morning hike to the summit \ud83c\udfd4\ufe0f The struggle is always worth it #hiking #nature",
+    hashtags: ["#hiking", "#nature"],
     likes: 201,
     comments: [2, 3, 4, 5].map(makeComment),
     shares: 15,
@@ -229,8 +306,10 @@ const INITIAL_POSTS: PostItem[] = [
     authorUsername: "@alexrivera",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alexrivera",
     imageUrl: "https://picsum.photos/seed/food4/600/400",
+    images: ["https://picsum.photos/seed/food4/600/400"],
     caption:
-      "Brunch goals achieved 🥑🍳 Recipe drop coming soon! #foodie #brunch",
+      "Brunch goals achieved \ud83e\udd51\ud83c\udf73 Recipe drop coming soon! #foodie #brunch",
+    hashtags: ["#foodie", "#brunch"],
     likes: 156,
     comments: [0, 1, 2].map(makeComment),
     shares: 8,
@@ -249,10 +328,13 @@ const INITIAL_POSTS: PostItem[] = [
     id: "p5",
     authorName: "Jordan Kim",
     authorUsername: "@jordankim",
+    authorUserId: "3",
     authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=jordan",
     imageUrl: "https://picsum.photos/seed/portrait5/600/400",
+    images: ["https://picsum.photos/seed/portrait5/600/400"],
     caption:
-      "Self-portrait series: chapter 3 📸 Exploring light and shadow #photography #portrait",
+      "Self-portrait series: chapter 3 \ud83d\udcf8 Exploring light and shadow #photography #portrait",
+    hashtags: ["#photography", "#portrait"],
     likes: 89,
     comments: [3, 4].map(makeComment),
     shares: 5,
@@ -266,6 +348,35 @@ const INITIAL_POSTS: PostItem[] = [
     likedByUser: false,
     savedByUser: false,
     isTrending: false,
+  },
+  {
+    id: "p6",
+    authorName: "Riley Lee",
+    authorUsername: "@rileylee",
+    authorUserId: "4",
+    authorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=riley",
+    imageUrl: "https://picsum.photos/seed/fashion6/600/400",
+    images: [
+      "https://picsum.photos/seed/fashion6/600/400",
+      "https://picsum.photos/seed/fashion7/600/400",
+      "https://picsum.photos/seed/fashion8/600/400",
+    ],
+    caption:
+      "New drop is live \u2728 Which look is your favorite? #fashion #style #ootd",
+    hashtags: ["#fashion", "#style", "#ootd"],
+    likes: 892,
+    comments: [0, 1, 2, 3].map(makeComment),
+    shares: 67,
+    saves: 204,
+    views: 12400,
+    reach: 9800,
+    impressions: 15600,
+    followersGained: 112,
+    timestamp: Date.now() - 1800000,
+    engagementScore: 892 + 4 * 2 + 67 * 3,
+    likedByUser: false,
+    savedByUser: false,
+    isTrending: true,
   },
 ];
 
@@ -317,96 +428,196 @@ const INITIAL_CONVOS: Conversation[] = [
 const INITIAL_ACHIEVEMENTS: Achievement[] = [
   {
     id: "a1",
-    icon: "📸",
+    icon: "\ud83d\udcf8",
     title: "First Post",
     description: "Publish your first post",
     unlocked: true,
   },
   {
     id: "a2",
-    icon: "🎯",
+    icon: "\ud83d\udcac",
+    title: "First Comment",
+    description: "Leave your first comment",
+    unlocked: false,
+  },
+  {
+    id: "a3",
+    icon: "\ud83d\udd04",
+    title: "First Share",
+    description: "Share your first post",
+    unlocked: false,
+  },
+  {
+    id: "a4",
+    icon: "\ud83c\udfaf",
     title: "100 Followers",
     description: "Reach 100 followers",
     unlocked: true,
   },
   {
-    id: "a3",
-    icon: "🔥",
+    id: "a5",
+    icon: "\u2b50",
+    title: "500 Followers",
+    description: "Reach 500 followers",
+    unlocked: true,
+  },
+  {
+    id: "a6",
+    icon: "\ud83c\udfc5",
+    title: "1K Followers",
+    description: "Reach 1,000 followers",
+    unlocked: true,
+  },
+  {
+    id: "a7",
+    icon: "\ud83d\udc8e",
+    title: "5K Followers",
+    description: "Reach 5,000 followers",
+    unlocked: false,
+  },
+  {
+    id: "a8",
+    icon: "\ud83d\ude80",
+    title: "10K Followers",
+    description: "Reach 10,000 followers",
+    unlocked: false,
+  },
+  {
+    id: "a9",
+    icon: "\ud83d\udd25",
     title: "First Viral Post",
     description: "Get a post trending",
     unlocked: true,
   },
   {
-    id: "a4",
-    icon: "🚀",
-    title: "10k Followers",
-    description: "Reach 10,000 followers",
+    id: "a10",
+    icon: "\ud83d\udcdd",
+    title: "10 Posts Created",
+    description: "Create 10 posts",
     unlocked: false,
   },
   {
-    id: "a5",
-    icon: "💯",
-    title: "100k Likes",
-    description: "Accumulate 100,000 total likes",
+    id: "a11",
+    icon: "\u2764\ufe0f",
+    title: "100 Likes Received",
+    description: "Accumulate 100 total likes",
+    unlocked: true,
+  },
+  {
+    id: "a12",
+    icon: "\ud83d\udc96",
+    title: "1K Likes Received",
+    description: "Accumulate 1,000 total likes",
     unlocked: false,
   },
   {
-    id: "a6",
-    icon: "⭐",
-    title: "Influencer",
+    id: "a13",
+    icon: "\ud83d\udcc8",
+    title: "Top Trending Post",
+    description: "Have a post appear in trending",
+    unlocked: true,
+  },
+  {
+    id: "a14",
+    icon: "\u26a1",
+    title: "Creator Level 5",
+    description: "Reach creator level 5",
+    unlocked: false,
+  },
+  {
+    id: "a15",
+    icon: "\ud83d\udc51",
+    title: "Creator Level 10",
     description: "Reach creator level 10",
     unlocked: false,
   },
+];
+
+const INITIAL_STORIES: Story[] = [
   {
-    id: "a7",
-    icon: "💬",
-    title: "Conversation Starter",
-    description: "Get 500 total comments",
-    unlocked: false,
+    id: "s1",
+    userId: "1",
+    username: "@samchen",
+    avatar: SAMPLE_AVATARS[0],
+    imageUrl: "https://picsum.photos/seed/story1/400/700",
+    createdAt: Date.now() - 300000,
+    viewCount: 842,
+    viewed: false,
   },
   {
-    id: "a8",
-    icon: "🌍",
-    title: "Global Reach",
-    description: "Reach 50k followers",
-    unlocked: false,
+    id: "s2",
+    userId: "2",
+    username: "@miatorres",
+    avatar: SAMPLE_AVATARS[1],
+    imageUrl: "https://picsum.photos/seed/story2/400/700",
+    createdAt: Date.now() - 900000,
+    viewCount: 1204,
+    viewed: false,
+  },
+  {
+    id: "s3",
+    userId: "3",
+    username: "@jordankim",
+    avatar: SAMPLE_AVATARS[2],
+    imageUrl: "https://picsum.photos/seed/story3/400/700",
+    createdAt: Date.now() - 1800000,
+    viewCount: 567,
+    viewed: true,
+  },
+  {
+    id: "s4",
+    userId: "4",
+    username: "@rileylee",
+    avatar: SAMPLE_AVATARS[3],
+    imageUrl: "https://picsum.photos/seed/story4/400/700",
+    createdAt: Date.now() - 600000,
+    viewCount: 2341,
+    viewed: false,
   },
 ];
 
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [profile, setProfile] = useState<Profile>({
+  const [profile, setProfile] = useState<UserProfile>({
     name: "Alex Rivera",
     username: "@alexrivera",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alexrivera",
-    bio: "Content creator • Travel • Photography 🌍",
+    bio: "Content creator \u2022 Travel \u2022 Photography \ud83c\udf0d",
     followers: 4820,
     following: 312,
     postsCount: 5,
     xp: 2400,
     level: 3,
   });
-
   const [posts, setPosts] = useState<PostItem[]>(INITIAL_POSTS);
+  const postsRef = useRef<PostItem[]>(INITIAL_POSTS);
+  postsRef.current = posts;
+
+  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [followedUserIds, setFollowedUserIds] = useState<Set<string>>(
+    new Set(["1", "2"]),
+  );
+  const [stories, setStories] = useState<Story[]>(INITIAL_STORIES);
   const [notifications, setNotifications] = useState<NotificationItem[]>([
     {
       id: "n0",
-      icon: "🔥",
+      icon: "\ud83d\udd25",
       message: "Your post 'Golden hour at Santorini' is trending!",
       timestamp: Date.now() - 300000,
       type: "viral",
     },
     {
       id: "n1",
-      icon: "👤",
+      icon: "\ud83d\udc64",
       message: "@samchen started following you",
       timestamp: Date.now() - 600000,
       type: "follower",
     },
     {
       id: "n2",
-      icon: "❤️",
+      icon: "\u2764\ufe0f",
       message: "@miatorres liked your post",
       timestamp: Date.now() - 900000,
       type: "like",
@@ -430,8 +641,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })),
     topPostId: "p1",
   });
-
+  const [currentRoute, setCurrentRoute] = useState<Route>({ page: "home" });
   const notifIdRef = useRef(10);
+
+  const navigate = useCallback((page: string, params?: Partial<Route>) => {
+    setCurrentRoute({ page, ...params });
+  }, []);
 
   const addNotification = useCallback(
     (notif: Omit<NotificationItem, "id" | "timestamp">) => {
@@ -444,6 +659,141 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  const savePost = useCallback((id: string) => {
+    setSavedPosts((prev) => {
+      const s = new Set(prev);
+      s.add(id);
+      return s;
+    });
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, savedByUser: true, saves: p.saves + 1 } : p,
+      ),
+    );
+  }, []);
+
+  const unsavePost = useCallback((id: string) => {
+    setSavedPosts((prev) => {
+      const s = new Set(prev);
+      s.delete(id);
+      return s;
+    });
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, savedByUser: false, saves: Math.max(0, p.saves - 1) }
+          : p,
+      ),
+    );
+  }, []);
+
+  const likePost = useCallback((id: string) => {
+    setLikedPosts((prev) => {
+      const s = new Set(prev);
+      s.add(id);
+      return s;
+    });
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, likedByUser: true, likes: p.likes + 1 } : p,
+      ),
+    );
+  }, []);
+
+  const unlikePost = useCallback((id: string) => {
+    setLikedPosts((prev) => {
+      const s = new Set(prev);
+      s.delete(id);
+      return s;
+    });
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, likedByUser: false, likes: Math.max(0, p.likes - 1) }
+          : p,
+      ),
+    );
+  }, []);
+
+  const followUser = useCallback((userId: string) => {
+    setFollowedUserIds((prev) => {
+      const s = new Set(prev);
+      s.add(userId);
+      return s;
+    });
+    setProfile((p) => ({ ...p, following: p.following + 1 }));
+  }, []);
+
+  const unfollowUser = useCallback((userId: string) => {
+    setFollowedUserIds((prev) => {
+      const s = new Set(prev);
+      s.delete(userId);
+      return s;
+    });
+    setProfile((p) => ({ ...p, following: Math.max(0, p.following - 1) }));
+  }, []);
+
+  const addStory = useCallback((story: Story) => {
+    setStories((prev) => [story, ...prev]);
+  }, []);
+
+  const addCommentReply = useCallback(
+    (postId: string, commentId: string, reply: CommentReply) => {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                comments: p.comments.map((c) =>
+                  c.id === commentId
+                    ? { ...c, replies: [...(c.replies ?? []), reply] }
+                    : c,
+                ),
+              }
+            : p,
+        ),
+      );
+    },
+    [],
+  );
+
+  // Stable addSimulatedPost using ref — no posts dependency to avoid infinite loops
+  const addSimulatedPost = useCallback((sp: SimulatedPostData): PostItem => {
+    const existing = postsRef.current.find((p) => p.id === sp.id);
+    if (existing) return existing;
+    const postItem: PostItem = {
+      id: sp.id,
+      authorName: sp.authorName,
+      authorUsername: sp.authorUsername,
+      authorUserId: sp.authorId,
+      authorAvatar: sp.authorAvatar,
+      imageUrl: sp.imageUrl,
+      images: sp.images,
+      caption: sp.caption,
+      hashtags: sp.hashtags,
+      likes: sp.likes,
+      comments: Array.from({ length: Math.min(sp.commentCount, 5) }, (_, i) =>
+        makeComment(i),
+      ),
+      shares: sp.shares,
+      saves: sp.saves,
+      views: sp.views,
+      reach: sp.reach,
+      impressions: sp.impressions,
+      followersGained: sp.followersGained,
+      timestamp: sp.timestamp,
+      engagementScore: sp.engagementScore,
+      likedByUser: false,
+      savedByUser: false,
+      isTrending: sp.isTrending,
+    };
+    setPosts((prev) => {
+      if (prev.find((p) => p.id === sp.id)) return prev;
+      return [...prev, postItem];
+    });
+    return postItem;
+  }, []);
 
   const boostFollowers = useCallback(
     (amount: number) => {
@@ -459,12 +809,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (added >= amount) clearInterval(interval);
       }, 60);
       addNotification({
-        icon: "🚀",
+        icon: "\ud83d\ude80",
         message: `Boost activated! You gained ${amount.toLocaleString()} followers!`,
         type: "boost",
       });
     },
     [addNotification],
+  );
+
+  const TWENTY_FOUR_MIN = 24 * 60 * 1000;
+  const activeStories = stories.filter(
+    (s) => Date.now() - s.createdAt < TWENTY_FOUR_MIN,
   );
 
   return (
@@ -474,6 +829,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setProfile,
         posts,
         setPosts,
+        savedPosts,
+        likedPosts,
+        followedUserIds,
+        stories: activeStories,
         notifications,
         addNotification,
         conversations,
@@ -485,6 +844,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         analyticsData,
         setAnalyticsData,
         boostFollowers,
+        savePost,
+        unsavePost,
+        likePost,
+        unlikePost,
+        followUser,
+        unfollowUser,
+        addStory,
+        addCommentReply,
+        addSimulatedPost,
+        currentRoute,
+        navigate,
       }}
     >
       {children}
@@ -496,4 +866,9 @@ export function useApp() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error("useApp must be used within AppProvider");
   return ctx;
+}
+
+export function extractHashtags(caption: string): string[] {
+  const matches = caption.match(/#\w+/g);
+  return matches ? matches.map((t) => t.toLowerCase()) : [];
 }

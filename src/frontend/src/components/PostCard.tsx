@@ -1,14 +1,19 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   BarChart2,
   Bookmark,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Heart,
   MessageCircle,
   MoreHorizontal,
   Share2,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
@@ -24,48 +29,86 @@ function timeAgo(ts: number): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function renderCaption(
+  caption: string,
+  navigate: (page: string, params?: Record<string, string>) => void,
+) {
+  const parts = caption.split(/(#\w+)/g);
+  // Use character offset as stable key instead of array index
+  let offset = 0;
+  return parts.map((part) => {
+    const key = `c${offset}`;
+    offset += part.length;
+    return part.startsWith("#") ? (
+      <button
+        key={key}
+        type="button"
+        onClick={() =>
+          navigate("hashtag", { tag: part.slice(1).toLowerCase() })
+        }
+        className="font-medium hover:underline"
+        style={{ color: "oklch(0.7 0.2 210)" }}
+      >
+        {part}
+      </button>
+    ) : (
+      <span key={key}>{part}</span>
+    );
+  });
+}
+
 interface Props {
   post: PostItem;
   index: number;
+  onOpenDetail?: (post: PostItem) => void;
 }
 
-export default function PostCard({ post, index }: Props) {
-  const { setPosts } = useApp();
+export default function PostCard({ post, index, onOpenDetail }: Props) {
+  const {
+    profile,
+    setPosts,
+    savedPosts,
+    likedPosts,
+    followedUserIds,
+    savePost,
+    unsavePost,
+    likePost,
+    unlikePost,
+    followUser,
+    unfollowUser,
+    navigate,
+  } = useApp();
   const [showStats, setShowStats] = useState(false);
+  const [carouselIdx, setCarouselIdx] = useState(0);
   const idx = index + 1;
 
+  const images =
+    post.images && post.images.length > 0 ? post.images : [post.imageUrl];
+  const isMultiImage = images.length > 1;
+
+  const isOwnPost = post.authorUsername === profile.username;
+  const isFollowing = post.authorUserId
+    ? followedUserIds.has(post.authorUserId)
+    : false;
+  const isSaved = savedPosts.has(post.id) || post.savedByUser;
+  const isLiked = likedPosts.has(post.id) || post.likedByUser;
+
   const toggleLike = () => {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === post.id
-          ? {
-              ...p,
-              likedByUser: !p.likedByUser,
-              likes: p.likedByUser ? p.likes - 1 : p.likes + 1,
-            }
-          : p,
-      ),
-    );
+    if (isLiked) unlikePost(post.id);
+    else likePost(post.id);
   };
-
   const toggleSave = () => {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === post.id
-          ? {
-              ...p,
-              savedByUser: !p.savedByUser,
-              saves: p.savedByUser ? p.saves - 1 : p.saves + 1,
-            }
-          : p,
-      ),
-    );
+    if (isSaved) unsavePost(post.id);
+    else savePost(post.id);
   };
-
-  const handleShare = () => {
+  const handleShare = () =>
     setPosts((prev) =>
       prev.map((p) => (p.id === post.id ? { ...p, shares: p.shares + 1 } : p)),
     );
+  const toggleFollow = () => {
+    if (!post.authorUserId) return;
+    if (isFollowing) unfollowUser(post.authorUserId);
+    else followUser(post.authorUserId);
   };
 
   const engagementRate =
@@ -77,9 +120,21 @@ export default function PostCard({ post, index }: Props) {
       : "0.0";
 
   return (
-    <article className="glass-card post-enter overflow-hidden">
+    <article
+      className="glass-card post-enter overflow-hidden"
+      data-ocid={`post.item.${idx}`}
+    >
+      {/* Header */}
       <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          onClick={() =>
+            post.authorUserId
+              ? navigate("user-profile", { userId: post.authorUserId })
+              : undefined
+          }
+        >
           <Avatar
             className="w-10 h-10"
             style={{ boxShadow: "0 0 0 2px oklch(0.6 0.22 295 / 0.4)" }}
@@ -87,7 +142,7 @@ export default function PostCard({ post, index }: Props) {
             <AvatarImage src={post.authorAvatar} alt={post.authorName} />
             <AvatarFallback>{post.authorName[0]}</AvatarFallback>
           </Avatar>
-          <div>
+          <div className="text-left">
             <p className="font-semibold text-sm text-foreground">
               {post.authorName}
             </p>
@@ -95,8 +150,29 @@ export default function PostCard({ post, index }: Props) {
               {post.authorUsername} · {timeAgo(post.timestamp)}
             </p>
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-2">
+          {!isOwnPost && post.authorUserId && (
+            <Button
+              data-ocid="post.follow.button"
+              size="sm"
+              variant="ghost"
+              onClick={toggleFollow}
+              className="h-7 px-2 text-xs gap-1"
+              style={{
+                color: isFollowing
+                  ? "oklch(0.65 0.2 175)"
+                  : "oklch(0.7 0.2 295)",
+              }}
+            >
+              {isFollowing ? (
+                <UserCheck className="w-3.5 h-3.5" />
+              ) : (
+                <UserPlus className="w-3.5 h-3.5" />
+              )}
+              {isFollowing ? "Following" : "Follow"}
+            </Button>
+          )}
           {post.isTrending && (
             <Badge
               style={{
@@ -107,91 +183,132 @@ export default function PostCard({ post, index }: Props) {
               }}
               className="text-xs"
             >
-              🔥 Trending
+              \ud83d\udd25 Trending
             </Badge>
           )}
-          <MoreHorizontal className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-foreground transition-colors" />
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => onOpenDetail?.(post)}
+          >
+            <MoreHorizontal className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
-      {post.imageUrl && (
+      {/* Carousel / Image */}
+      {images.length > 0 && (
         <div className="relative">
-          <img
-            src={post.imageUrl}
-            alt="post"
-            className="w-full object-cover"
-            style={{ maxHeight: "400px" }}
-            loading="lazy"
-          />
+          <button
+            type="button"
+            className="w-full cursor-pointer"
+            onClick={() => onOpenDetail?.(post)}
+          >
+            <img
+              src={images[carouselIdx]}
+              alt="post"
+              className="w-full object-cover"
+              style={{ maxHeight: "400px" }}
+              loading="lazy"
+            />
+          </button>
+          {isMultiImage && (
+            <>
+              {carouselIdx > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCarouselIdx((i) => i - 1)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              )}
+              {carouselIdx < images.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => setCarouselIdx((i) => i + 1)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                {images.map((imgSrc) => (
+                  <button
+                    key={imgSrc.slice(-12)}
+                    type="button"
+                    onClick={() => setCarouselIdx(images.indexOf(imgSrc))}
+                    className="w-1.5 h-1.5 rounded-full transition-all"
+                    style={{
+                      background:
+                        images.indexOf(imgSrc) === carouselIdx
+                          ? "white"
+                          : "rgba(255,255,255,0.4)",
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="absolute top-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
+                {carouselIdx + 1}/{images.length}
+              </div>
+            </>
+          )}
         </div>
       )}
 
+      {/* Caption */}
       <div className="px-4 py-3">
         <p className="text-sm text-foreground leading-relaxed">
-          {post.caption}
+          {renderCaption(post.caption, (page, params) =>
+            navigate(page, params as { tag?: string }),
+          )}
         </p>
       </div>
 
+      {/* Actions */}
       <div className="flex items-center gap-3 px-4 pb-3">
         <button
           type="button"
-          data-ocid={`post.like_button.${idx}`}
+          data-ocid="post.like.button"
           onClick={toggleLike}
-          className={`flex items-center gap-1.5 text-sm font-medium transition-all duration-200 hover:scale-110 ${
-            post.likedByUser
-              ? "text-pink-400"
-              : "text-muted-foreground hover:text-pink-400"
-          }`}
+          className={`flex items-center gap-1.5 text-sm font-medium transition-all duration-200 hover:scale-110 ${isLiked ? "text-pink-400" : "text-muted-foreground hover:text-pink-400"}`}
         >
-          <Heart
-            className={`w-5 h-5 ${post.likedByUser ? "fill-current" : ""}`}
-          />
+          <Heart className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`} />
           {post.likes.toLocaleString()}
         </button>
-
         <button
           type="button"
-          data-ocid={`post.comment_button.${idx}`}
+          data-ocid="post.comment.button"
+          onClick={() => onOpenDetail?.(post)}
           className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-blue-400 transition-all duration-200 hover:scale-110"
         >
           <MessageCircle className="w-5 h-5" />
           {post.comments.length}
         </button>
-
         <button
           type="button"
-          data-ocid={`post.share_button.${idx}`}
+          data-ocid="post.share.button"
           onClick={handleShare}
           className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-cyan-400 transition-all duration-200 hover:scale-110"
         >
           <Share2 className="w-5 h-5" />
           {post.shares}
         </button>
-
         <button
           type="button"
-          data-ocid={`post.save_button.${idx}`}
+          data-ocid="post.save.button"
           onClick={toggleSave}
-          className={`flex items-center gap-1.5 text-sm font-medium transition-all duration-200 hover:scale-110 ${
-            post.savedByUser
-              ? "text-yellow-400"
-              : "text-muted-foreground hover:text-yellow-400"
-          }`}
+          className={`flex items-center gap-1.5 text-sm font-medium transition-all duration-200 hover:scale-110 ml-auto ${isSaved ? "text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}`}
         >
-          <Bookmark
-            className={`w-5 h-5 ${post.savedByUser ? "fill-current" : ""}`}
-          />
-          {post.saves}
+          <Bookmark className={`w-5 h-5 ${isSaved ? "fill-current" : ""}`} />
         </button>
-
         <button
           type="button"
-          data-ocid={`post.stats_toggle.${idx}`}
+          data-ocid="post.stats.toggle"
           onClick={() => setShowStats((s) => !s)}
-          className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <BarChart2 className="w-3.5 h-3.5" />
-          Stats
           {showStats ? (
             <ChevronUp className="w-3 h-3" />
           ) : (
@@ -200,22 +317,12 @@ export default function PostCard({ post, index }: Props) {
         </button>
       </div>
 
-      {/* Performance Panel */}
       {showStats && (
-        <div
-          className="mx-4 mb-4 rounded-xl p-4 animate-in slide-in-from-top-2 duration-200"
-          style={{
-            background: "oklch(0.16 0.018 280 / 0.8)",
-            border: "1px solid oklch(0.28 0.025 280 / 0.4)",
-          }}
-        >
-          <p
-            className="text-xs font-semibold mb-3"
-            style={{ color: "oklch(0.65 0.2 295)" }}
+        <div className="px-4 pb-4">
+          <div
+            className="rounded-xl p-3 grid grid-cols-3 gap-3 text-center"
+            style={{ background: "oklch(0.16 0.018 280 / 0.6)" }}
           >
-            Post Performance
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
             {[
               { label: "Views", value: post.views.toLocaleString() },
               { label: "Reach", value: post.reach.toLocaleString() },
@@ -223,34 +330,25 @@ export default function PostCard({ post, index }: Props) {
                 label: "Impressions",
                 value: post.impressions.toLocaleString(),
               },
-              { label: "Followers Gained", value: `+${post.followersGained}` },
               { label: "Likes", value: post.likes.toLocaleString() },
               { label: "Comments", value: post.comments.length.toString() },
-              { label: "Shares", value: post.shares.toString() },
-              { label: "Eng. Rate", value: `${engagementRate}%` },
+              { label: "Shares", value: post.shares.toLocaleString() },
+              { label: "Followers Gained", value: `+${post.followersGained}` },
+              { label: "Engagement Rate", value: `${engagementRate}%` },
+              {
+                label: "Score",
+                value: Math.floor(post.engagementScore).toLocaleString(),
+              },
             ].map(({ label, value }) => (
               <div key={label}>
-                <p className="text-sm font-bold text-foreground">{value}</p>
-                <p className="text-xs text-muted-foreground">{label}</p>
+                <p
+                  className="text-xs font-bold"
+                  style={{ color: "oklch(0.7 0.2 295)" }}
+                >
+                  {value}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {post.comments.length > 0 && (
-        <div
-          className="px-4 pb-4 border-t"
-          style={{ borderColor: "oklch(0.25 0.025 280 / 0.3)" }}
-        >
-          <div className="pt-3 space-y-1">
-            {post.comments.slice(-2).map((c) => (
-              <p key={c.id} className="text-xs">
-                <span className="font-semibold text-foreground">
-                  {c.username}
-                </span>{" "}
-                <span className="text-muted-foreground">{c.text}</span>
-              </p>
             ))}
           </div>
         </div>

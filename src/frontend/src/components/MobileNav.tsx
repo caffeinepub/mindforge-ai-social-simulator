@@ -4,17 +4,19 @@ import {
   Home,
   MessageCircle,
   TrendingUp,
+  Trophy,
   User,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
 const navItems = [
-  { id: "home", icon: Home, ocid: "nav.home_link" },
-  { id: "trending", icon: TrendingUp, ocid: "nav.trending_link" },
-  { id: "explore", icon: Compass, ocid: "nav.explore_link" },
-  { id: "messages", icon: MessageCircle, ocid: "nav.messages_link" },
-  { id: "profile", icon: User, ocid: "nav.profile_link" },
-  { id: "analytics", icon: BarChart2, ocid: "nav.analytics_link" },
+  { id: "home", icon: Home, ocid: "nav.home.link" },
+  { id: "trending", icon: TrendingUp, ocid: "nav.trending.link" },
+  { id: "explore", icon: Compass, ocid: "nav.explore.link" },
+  { id: "messages", icon: MessageCircle, ocid: "nav.messages.link" },
+  { id: "profile", icon: User, ocid: "nav.profile.link" },
+  { id: "analytics", icon: BarChart2, ocid: "nav.analytics.link" },
+  { id: "leaderboard", icon: Trophy, ocid: "nav.leaderboard.link" },
 ];
 
 interface Props {
@@ -40,7 +42,7 @@ export default function MobileNav({ activePage, onNavigate }: Props) {
           key={id}
           data-ocid={ocid}
           onClick={() => onNavigate(id)}
-          className="flex-1 flex flex-col items-center justify-center py-3 gap-1 relative"
+          className="flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 relative"
         >
           <div className="relative">
             <Icon

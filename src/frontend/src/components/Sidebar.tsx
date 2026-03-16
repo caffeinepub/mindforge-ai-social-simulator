@@ -5,32 +5,39 @@ import {
   Home,
   MessageCircle,
   TrendingUp,
+  Trophy,
   User,
   Zap,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
 const navItems = [
-  { id: "home", icon: Home, label: "Home", ocid: "nav.home_link" },
+  { id: "home", icon: Home, label: "Home", ocid: "nav.home.link" },
   {
     id: "trending",
     icon: TrendingUp,
     label: "Trending",
-    ocid: "nav.trending_link",
+    ocid: "nav.trending.link",
   },
-  { id: "explore", icon: Compass, label: "Explore", ocid: "nav.explore_link" },
+  { id: "explore", icon: Compass, label: "Explore", ocid: "nav.explore.link" },
   {
     id: "messages",
     icon: MessageCircle,
     label: "Messages",
-    ocid: "nav.messages_link",
+    ocid: "nav.messages.link",
   },
-  { id: "profile", icon: User, label: "Profile", ocid: "nav.profile_link" },
+  { id: "profile", icon: User, label: "Profile", ocid: "nav.profile.link" },
   {
     id: "analytics",
     icon: BarChart2,
     label: "Analytics",
-    ocid: "nav.analytics_link",
+    ocid: "nav.analytics.link",
+  },
+  {
+    id: "leaderboard",
+    icon: Trophy,
+    label: "Leaderboard",
+    ocid: "nav.leaderboard.link",
   },
 ];
 
@@ -78,11 +85,7 @@ export default function Sidebar({ activePage, onNavigate }: Props) {
               key={id}
               data-ocid={ocid}
               onClick={() => onNavigate(id)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${
-                isActive
-                  ? "text-white"
-                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-              }`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${isActive ? "text-white" : "text-muted-foreground hover:text-foreground hover:bg-white/5"}`}
               style={
                 isActive
                   ? {
@@ -111,7 +114,16 @@ export default function Sidebar({ activePage, onNavigate }: Props) {
       </nav>
 
       <div className="px-2 text-xs text-muted-foreground">
-        © {new Date().getFullYear()} MindForge
+        © {new Date().getFullYear()}.
+        <a
+          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground transition-colors"
+        >
+          {" "}
+          Built with ❤ using caffeine.ai
+        </a>
       </div>
     </aside>
   );
