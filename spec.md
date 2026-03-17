@@ -1,52 +1,39 @@
 # MindForge AI Social Simulator
 
 ## Current State
-MindForge V4 Phase 2 is complete. The app has:
-- Full post feed, engagement simulation, wave-based engagement engine
-- AI Influencer Ecosystem with 50 AI creators posting, commenting, collaborating
-- Creator Economy: Monetization page, Merch Store, Brand Sponsorships, Fan Tips
-- PostItem has fields: id, likes, comments, shares, saves, views, reach, impressions, engagementScore, isTrending
-- PostDetailView shows engagement metrics (views, reach, engagement rate)
-- HomeFeed has a post creation box with caption textarea and image upload
-- useAIInfluencers.ts handles background AI activity and notifications
-- No viral stage tracking, no post strength meter, no algorithm update system
+V4 Phase 1 (UI/UX + Messaging + Watch Time/Algorithm) is complete. The app has:
+- Full monetization page with sponsorships (accept/decline only, no negotiation)
+- Analytics page with region breakdown, watch time, follower growth
+- Fan tips simulated as notifications (no loyalty levels)
+- Smart notifications partially implemented
+- Brand deals fire as notifications but have no negotiation flow
+- AppContext tracks monetization, posts, followers, AI creators
 
 ## Requested Changes (Diff)
 
 ### Add
-- `viralStage` field (0-4) to PostItem type in AppContext
-- `viralScore` field to PostItem (computed from engagement signals)
-- `useViralEngine.ts` hook: runs on interval, advances post viral stages based on viralScore, fires momentum notifications for user's posts
-- `viralEngine.ts` utility: viral score formula, stage thresholds, algorithm weight system (mutable weights for shares/comments/likes/saves), trending hashtag boost logic
-- `PostStrengthMeter` component: live meter shown in HomeFeed post creation box, reacts to caption length, hashtag count, and time of day (simulated posting time score). Shows a labeled progress bar with text like "Weak", "Good", "Strong", "Excellent"
-- Algorithm Update notification system in `useViralEngine.ts`: fires every 3-5 minutes, randomly shifts algorithm weights and fires a notification like "Platform Update: Shares are now more important for reach"
-- Momentum signal badge in PostDetailView: shows contextual hints based on viralStage — Stage 1: "Picking up traction", Stage 2: "Trending fast", Stage 3: "Exploding in reach", Stage 4: "🔥 Trending Worldwide"
-- Posts at viralStage 3-4 gain `isTrending: true` and appear at top of Trending page
+1. **Brand Deal Negotiation** — On pending sponsorship cards in Monetization page, add three negotiation buttons (1.25x, 1.5x, 2x offer). Higher multipliers (2x) have a 40% rejection chance. Rejected negotiations show a notification and remove the deal. Accepted negotiations update the deal value and fire a success notification.
+2. **Fan Loyalty System** — 4 tiers: Fan, Super Fan, VIP Fan, Ultra Fan. Fans upgrade based on engagement over time (consistent posts = more upgrades). AppContext tracks `fanLoyalty: { fans, superFans, vipFans, ultraFans }`. Analytics page shows a fan loyalty breakdown chart (pie or bar). Notifications fire when fans upgrade (e.g., "12 fans upgraded to Super Fan!"). Higher-tier fans contribute more engagement multiplier.
+3. **Content Series System** — When creating a post, user can optionally mark it as part of a named series (e.g., "My Fitness Journey Part 1"). Series posts are grouped on the profile page under a "Series" tab. When a new part is posted, returning viewers (loyal/superfans) get a notification. Series posts receive a small retention bonus.
+4. **Reputation & Trust System** — Visible "Trust Score" (0–100) shown on the user's profile. Increases with: consistent posting, high engagement quality, accepted brand deals. Decreases with: spam behavior, fake follower purchase, shadow ban. Trust score affects reach multiplier (high trust = +20% reach, low trust = -30% reach). Small badge on profile (Trusted Creator / Rising Creator / At Risk).
+5. **Burnout & Consistency System** — Track posting frequency. Overposting (5+ posts in a short period) triggers a "Burnout Warning" notification and reduces reach by 20% temporarily. Inactivity (no posts for a long simulated period) triggers a "Your audience is getting cold" notification and starts a slow follower drop. Consistent posting (steady cadence) gives a +10% engagement bonus.
+6. **Smart Notification System** — Add context-aware notifications: "Best time to post right now", "Your audience is most active", "You're on a streak — keep posting!", "A post from yesterday is gaining traction". These fire based on simulated conditions (time of day simulation, post activity, engagement trends).
 
 ### Modify
-- `AppContext.tsx`: add `viralStage` and `viralScore` to `PostItem` interface; initialize existing posts with `viralStage: 0, viralScore: 0`
-- `App.tsx`: import and call `useViralEngine()` in AppShell
-- `HomeFeed.tsx`: add `PostStrengthMeter` below the caption textarea, above the action buttons
-- `PostDetailView.tsx`: add momentum signal badge below the engagement stats grid, only shown when viralStage > 0
-- Trending page: sort by viralStage desc first, then engagementScore
+- `Monetization.tsx` — Add negotiation buttons (1.25x, 1.5x, 2x) on pending sponsorship cards alongside the existing Accept button
+- `Analytics.tsx` — Add fan loyalty breakdown section (pie chart with 4 tiers + counts)
+- `AppContext.tsx` — Add `fanLoyalty` state, `reputationScore`, `burnoutStatus`, `negotiateSponsorship()`, `contentSeries[]`, `addToSeries()` actions
+- `Profile.tsx` — Show Trust Score badge and reputation tier; add Series tab to user's profile posts
+- Post creation UI — Add optional "Add to Series" input when creating posts
+- Notification system — Add smart notification triggers for posting time, streaks, traction alerts
 
 ### Remove
 - Nothing removed
 
 ## Implementation Plan
-1. Create `src/frontend/src/utils/viralEngine.ts`
-   - Export `ALGORITHM_WEIGHTS` object: `{ shares: 3, comments: 2, likes: 1, saves: 1.5 }` (mutable)
-   - Export `computeViralScore(post, weights)` function
-   - Export `VIRAL_STAGE_THRESHOLDS: [0, 500, 2000, 8000, 20000]`
-   - Export `getViralStage(score)` returning 0-4
-   - Export `getMomentumSignal(stage)` returning label string
-   - Export `ALGORITHM_UPDATE_EVENTS`: array of {message, weightChange} objects
-   - Export `computePostStrength(caption, hashtags)` returning 0-100 score
-2. Create `src/frontend/src/hooks/useViralEngine.ts`
-   - On interval (every 8-15s), iterate user's posts and advance viralStage if viralScore crosses threshold
-   - Fire notification when user post advances stage (momentum hints)
-   - On separate interval (every 3-5 min), pick random algorithm update, mutate ALGORITHM_WEIGHTS, fire platform announcement notification
-3. Add `PostStrengthMeter` inline in HomeFeed or as small component file
-4. Update AppContext PostItem type with viralStage/viralScore fields
-5. Update PostDetailView to show momentum badge when viralStage > 0
-6. Wire useViralEngine in App.tsx
+1. Extend AppContext with: `fanLoyalty`, `reputationScore`, `burnoutStatus`, `contentSeries`, `negotiateSponsorship()`, `addPostToSeries()` — plus simulation logic for fan upgrades, reputation changes, burnout tracking, and smart notification timing
+2. Update Monetization.tsx: add negotiation buttons with risk logic on pending deals
+3. Update Analytics.tsx: add fan loyalty chart section
+4. Update Profile.tsx: show Trust Score badge, add Series tab
+5. Update post creation modal: add optional series field
+6. Wire smart notifications into the notification simulation loop

@@ -57,7 +57,13 @@ const TOOLTIP_STYLE = {
 };
 
 export default function Monetization() {
-  const { monetization, acceptSponsorship, navigate, profile } = useApp();
+  const {
+    monetization,
+    acceptSponsorship,
+    negotiateSponsorship,
+    navigate,
+    profile,
+  } = useApp();
   const niche = profile.niche || "Tech";
   const cpm = CPM_BY_NICHE[niche] ?? 3.5;
   const nicheColor = NICHE_COLORS[niche] ?? "#a855f7";
@@ -458,19 +464,63 @@ export default function Monetization() {
                   {fmt(deal.dealValue)}
                 </p>
                 {deal.status === "pending" && (
-                  <button
-                    type="button"
-                    data-ocid={`monetization.accept_deal.button.${i + 1}`}
-                    onClick={() => acceptSponsorship(deal.id)}
-                    className="mt-3 w-full py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, oklch(0.55 0.25 295), oklch(0.55 0.2 240))",
-                      color: "white",
-                    }}
-                  >
-                    Accept Deal ✓
-                  </button>
+                  <div className="mt-3 space-y-2">
+                    <button
+                      type="button"
+                      data-ocid={`monetization.accept_deal.button.${i + 1}`}
+                      onClick={() => acceptSponsorship(deal.id)}
+                      className="w-full py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, oklch(0.55 0.25 295), oklch(0.55 0.2 240))",
+                        color: "white",
+                      }}
+                    >
+                      Accept ${deal.dealValue.toLocaleString()} ✓
+                    </button>
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      or negotiate:
+                    </p>
+                    <div className="grid grid-cols-3 gap-1">
+                      {([1.25, 1.5, 2] as const).map((mult) => (
+                        <button
+                          key={mult}
+                          type="button"
+                          data-ocid={`monetization.negotiate_${mult.toString().replace(".", "_")}.button.${i + 1}`}
+                          onClick={() => negotiateSponsorship(deal.id, mult)}
+                          title={
+                            mult === 1.25
+                              ? "Always accepted"
+                              : mult === 1.5
+                                ? "70% chance"
+                                : "40% chance — risky!"
+                          }
+                          className="py-1 rounded-lg text-[10px] font-semibold transition-all hover:opacity-80"
+                          style={{
+                            background:
+                              mult === 2
+                                ? "oklch(0.55 0.22 25 / 0.25)"
+                                : mult === 1.5
+                                  ? "oklch(0.7 0.2 65 / 0.2)"
+                                  : "oklch(0.68 0.2 150 / 0.2)",
+                            color:
+                              mult === 2
+                                ? "oklch(0.65 0.22 25)"
+                                : mult === 1.5
+                                  ? "oklch(0.75 0.2 65)"
+                                  : "oklch(0.72 0.2 145)",
+                            border: `1px solid ${mult === 2 ? "oklch(0.55 0.22 25 / 0.4)" : mult === 1.5 ? "oklch(0.7 0.2 65 / 0.3)" : "oklch(0.68 0.2 150 / 0.3)"}`,
+                          }}
+                        >
+                          {mult}x
+                          {mult === 1.25 ? " 🟢" : mult === 1.5 ? " 🟡" : " 🔴"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-muted-foreground text-center">
+                      🟢 safe · 🟡 risky · 🔴 high risk
+                    </p>
+                  </div>
                 )}
                 {deal.status === "active" && deal.acceptedAt && (
                   <p className="text-xs text-muted-foreground mt-2">

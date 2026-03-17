@@ -5,9 +5,11 @@ import Sidebar from "./components/Sidebar";
 import { AppProvider, useApp } from "./context/AppContext";
 import { useIsMobile } from "./hooks/use-mobile";
 import { useAIInfluencers } from "./hooks/useAIInfluencers";
+import { useCollaborationSimulator } from "./hooks/useCollaborationSimulator";
 import { useEngagementSimulator } from "./hooks/useEngagementSimulator";
 import { useViralEngine } from "./hooks/useViralEngine";
 import Analytics from "./pages/Analytics";
+import CreatorHouses from "./pages/CreatorHouses";
 import Explore from "./pages/Explore";
 import HashtagPage from "./pages/HashtagPage";
 import HomeFeed from "./pages/HomeFeed";
@@ -19,11 +21,12 @@ import Profile from "./pages/Profile";
 import Trending from "./pages/Trending";
 
 function AppShell() {
-  const { currentRoute, navigate } = useApp();
+  const { currentRoute, navigate, hideMobileNav } = useApp();
   const isMobile = useIsMobile();
   useEngagementSimulator();
   useAIInfluencers();
   useViralEngine();
+  useCollaborationSimulator();
 
   const activePage = currentRoute.page;
 
@@ -47,6 +50,8 @@ function AppShell() {
         return <MerchStore />;
       case "leaderboard":
         return <Leaderboard />;
+      case "houses":
+        return <CreatorHouses />;
       case "user-profile":
         return <Profile userId={currentRoute.userId} />;
       case "hashtag":
@@ -68,13 +73,13 @@ function AppShell() {
         style={{
           marginLeft: isMobile ? 0 : "240px",
           marginRight: isMobile ? 0 : "288px",
-          paddingBottom: isMobile ? "80px" : 0,
+          paddingBottom: isMobile && !hideMobileNav ? "80px" : 0,
         }}
       >
         {renderPage()}
       </main>
       {!isMobile && <NotificationsSidebar />}
-      {isMobile && (
+      {isMobile && !hideMobileNav && (
         <MobileNav activePage={activePage} onNavigate={handleNavigate} />
       )}
       <Toaster

@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -54,6 +55,7 @@ export interface PostItem {
   isTrending: boolean;
   viralStage?: number;
   viralScore?: number;
+  watchTime?: number;
 }
 
 export interface Story {
@@ -85,7 +87,12 @@ export interface NotificationItem {
     | "sponsorship"
     | "merch_sale"
     | "collab_request"
-    | "collab_accepted";
+    | "collab_accepted"
+    | "challenge"
+    | "event"
+    | "shadow_ban"
+    | "house"
+    | "smart";
   collabId?: string;
   collabCreatorId?: string;
   collabCreatorName?: string;
@@ -112,6 +119,9 @@ export interface Conversation {
   username: string;
   avatar: string;
   messages: Message[];
+  type: "ai_creator" | "brand" | "fan" | "system";
+  niche?: string;
+  unread?: number;
 }
 
 export interface UserProfile {
@@ -182,6 +192,88 @@ export interface MonetizationData {
   activeSponsorships: SponsorshipDeal[];
 }
 
+// V4 Phase 4 — Social Collaboration & Platform Simulation types
+export interface CreatorHouseMember {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string;
+  followers: number;
+}
+
+export interface CreatorHouse {
+  id: string;
+  name: string;
+  emoji: string;
+  niche: string;
+  members: CreatorHouseMember[];
+  totalFollowers: number;
+  rank: number;
+}
+
+export interface CompetitionEntry {
+  userId: string;
+  name: string;
+  username: string;
+  avatar: string;
+  score: number;
+}
+
+export interface Competition {
+  id: string;
+  name: string;
+  emoji: string;
+  type: "views" | "shares" | "likes";
+  joined: boolean;
+  leaderboard: CompetitionEntry[];
+  weekEndsAt: number;
+  reward: string;
+}
+
+export interface WeeklyChallenge {
+  id: string;
+  title: string;
+  description: string;
+  target: number;
+  current: number;
+  completed: boolean;
+  reward: string;
+  rewardClaimed: boolean;
+}
+
+export interface PlatformEvent {
+  id: string;
+  hashtag: string;
+  label: string;
+  reachMultiplier: number;
+  active: boolean;
+}
+
+export interface ShadowBan {
+  active: boolean;
+  endsAt: number;
+}
+
+export interface AudienceRegions {
+  northAmerica: number;
+  europe: number;
+  asia: number;
+  southAmerica: number;
+}
+
+export interface FanLoyalty {
+  fans: number;
+  superFans: number;
+  vipFans: number;
+  ultraFans: number;
+}
+
+export interface ContentSeries {
+  id: string;
+  name: string;
+  postIds: string[];
+}
+
 interface AppContextType {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
@@ -199,6 +291,8 @@ interface AppContextType {
   setAchievements: React.Dispatch<React.SetStateAction<Achievement[]>>;
   unreadDMs: number;
   setUnreadDMs: React.Dispatch<React.SetStateAction<number>>;
+  hideMobileNav: boolean;
+  setHideMobileNav: React.Dispatch<React.SetStateAction<boolean>>;
   analyticsData: AnalyticsData;
   setAnalyticsData: React.Dispatch<React.SetStateAction<AnalyticsData>>;
   monetization: MonetizationData;
@@ -226,6 +320,35 @@ interface AppContextType {
   addSimulatedPost: (post: SimulatedPostData) => PostItem;
   currentRoute: Route;
   navigate: (page: string, params?: Partial<Route>) => void;
+  // V4 Phase 4
+  houses: CreatorHouse[];
+  setHouses: React.Dispatch<React.SetStateAction<CreatorHouse[]>>;
+  userHouseId: string | null;
+  setUserHouseId: React.Dispatch<React.SetStateAction<string | null>>;
+  competitions: Competition[];
+  setCompetitions: React.Dispatch<React.SetStateAction<Competition[]>>;
+  weeklyChallenges: WeeklyChallenge[];
+  setWeeklyChallenges: React.Dispatch<React.SetStateAction<WeeklyChallenge[]>>;
+  activePlatformEvent: PlatformEvent | null;
+  setActivePlatformEvent: React.Dispatch<
+    React.SetStateAction<PlatformEvent | null>
+  >;
+  shadowBan: ShadowBan;
+  setShadowBan: React.Dispatch<React.SetStateAction<ShadowBan>>;
+  audienceRegions: AudienceRegions;
+  joinHouse: (houseId: string) => void;
+  createHouse: (name: string, emoji: string, niche: string) => void;
+  joinCompetition: (competitionId: string) => void;
+  claimChallengeReward: (challengeId: string) => void;
+  // Phase 2
+  fanLoyalty: FanLoyalty;
+  reputationScore: number;
+  burnoutActive: boolean;
+  coldAudienceActive: boolean;
+  contentSeries: ContentSeries[];
+  negotiateSponsorship: (id: string, multiplier: 1.25 | 1.5 | 2) => void;
+  addPostToSeries: (postId: string, seriesName: string) => void;
+  sessionStartFollowers: number;
 }
 
 export const SAMPLE_COMMENTS = [
@@ -308,6 +431,7 @@ const INITIAL_POSTS: PostItem[] = [
     isTrending: true,
     viralStage: 3,
     viralScore: 5000,
+    watchTime: 82,
   },
   {
     id: "p2",
@@ -335,6 +459,7 @@ const INITIAL_POSTS: PostItem[] = [
     isTrending: true,
     viralStage: 2,
     viralScore: 1500,
+    watchTime: 71,
   },
   {
     id: "p3",
@@ -365,6 +490,7 @@ const INITIAL_POSTS: PostItem[] = [
     isTrending: false,
     viralStage: 0,
     viralScore: 0,
+    watchTime: 58,
   },
   {
     id: "p4",
@@ -391,6 +517,7 @@ const INITIAL_POSTS: PostItem[] = [
     isTrending: false,
     viralStage: 0,
     viralScore: 0,
+    watchTime: 63,
   },
   {
     id: "p5",
@@ -418,6 +545,7 @@ const INITIAL_POSTS: PostItem[] = [
     isTrending: false,
     viralStage: 0,
     viralScore: 0,
+    watchTime: 47,
   },
   {
     id: "p6",
@@ -449,49 +577,233 @@ const INITIAL_POSTS: PostItem[] = [
     isTrending: true,
     viralStage: 4,
     viralScore: 15000,
+    watchTime: 88,
   },
 ];
 
 const INITIAL_CONVOS: Conversation[] = [
   {
-    id: "conv1",
-    name: "Sam Chen",
-    username: "@samchen",
-    avatar: SAMPLE_AVATARS[0],
+    id: "conv-ai-1",
+    name: "FitPulse Nova",
+    username: "@fitpulse_nova",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=fitpulse",
+    type: "ai_creator",
+    niche: "fitness",
+    unread: 2,
     messages: [
       {
-        id: "m1",
-        text: "Hey I love your posts!",
+        id: "m-ai1-1",
+        text: "Hey! Loved your last post 🔥 wanna collab on a fitness reel?",
         sent: false,
-        timestamp: Date.now() - 600000,
+        timestamp: Date.now() - 480000,
       },
     ],
   },
   {
-    id: "conv2",
-    name: "Mia Torres",
-    username: "@miatorres",
-    avatar: SAMPLE_AVATARS[1],
+    id: "conv-ai-2",
+    name: "TechOrbit",
+    username: "@tech_orbit",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=techorbit",
+    type: "ai_creator",
+    niche: "tech",
+    unread: 1,
     messages: [
       {
-        id: "m2",
-        text: "Your content is amazing!",
+        id: "m-ai2-1",
+        text: "Sick idea — let's build something that goes viral in the tech space 📱",
         sent: false,
-        timestamp: Date.now() - 1200000,
+        timestamp: Date.now() - 900000,
       },
     ],
   },
   {
-    id: "conv3",
-    name: "Jordan Kim",
-    username: "@jordankim",
-    avatar: SAMPLE_AVATARS[2],
+    id: "conv-ai-3",
+    name: "MemeLord99",
+    username: "@memelord99",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=memelord",
+    type: "ai_creator",
+    niche: "comedy",
+    unread: 0,
     messages: [
       {
-        id: "m3",
-        text: "Followed you today!",
+        id: "m-ai3-1",
+        text: "lmaooo dude your posts are actually hilarious",
         sent: false,
         timestamp: Date.now() - 3600000,
+      },
+      {
+        id: "m-ai3-2",
+        text: "collab when? 😂",
+        sent: false,
+        timestamp: Date.now() - 3540000,
+      },
+    ],
+  },
+  {
+    id: "conv-ai-4",
+    name: "AestheticMoments",
+    username: "@aesthetic_moments",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=aesthetic",
+    type: "ai_creator",
+    niche: "photography",
+    unread: 0,
+    messages: [
+      {
+        id: "m-ai4-1",
+        text: "Your travel shots are stunning ✨ Do you use a DSLR?",
+        sent: false,
+        timestamp: Date.now() - 7200000,
+      },
+    ],
+  },
+  {
+    id: "conv-ai-5",
+    name: "MotivateDaily",
+    username: "@motivate_daily",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=motivate",
+    type: "ai_creator",
+    niche: "motivation",
+    unread: 0,
+    messages: [
+      {
+        id: "m-ai5-1",
+        text: "You're doing amazing work. Keep pushing! 💪",
+        sent: false,
+        timestamp: Date.now() - 14400000,
+      },
+    ],
+  },
+  {
+    id: "conv-brand-1",
+    name: "TechGear Pro",
+    username: "@techgear_pro",
+    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=techgear",
+    type: "brand",
+    unread: 1,
+    messages: [
+      {
+        id: "m-b1-1",
+        text: "Hi! We'd love to discuss a partnership with you. Your tech content is a perfect fit for our brand.",
+        sent: false,
+        timestamp: Date.now() - 1800000,
+      },
+    ],
+  },
+  {
+    id: "conv-brand-2",
+    name: "FitLife Supplements",
+    username: "@fitlife_supplements",
+    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=fitlife",
+    type: "brand",
+    unread: 0,
+    messages: [
+      {
+        id: "m-b2-1",
+        text: "Great timing — we're looking for creators in your niche. Let's talk numbers 💰",
+        sent: false,
+        timestamp: Date.now() - 86400000,
+      },
+    ],
+  },
+  {
+    id: "conv-brand-3",
+    name: "CreatorKit",
+    username: "@creator_kit",
+    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=creatorkit",
+    type: "brand",
+    unread: 0,
+    messages: [
+      {
+        id: "m-b3-1",
+        text: "We've been following your content for a while. Ready to level up with CreatorKit Pro?",
+        sent: false,
+        timestamp: Date.now() - 172800000,
+      },
+    ],
+  },
+  {
+    id: "conv-fan-1",
+    name: "superfan_alex",
+    username: "@superfan_alex",
+    avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=alex",
+    type: "fan",
+    unread: 3,
+    messages: [
+      {
+        id: "m-f1-1",
+        text: "omg you replied!! I love your content so much 😭",
+        sent: false,
+        timestamp: Date.now() - 120000,
+      },
+      {
+        id: "m-f1-2",
+        text: "your last post was everything 🔥🔥🔥",
+        sent: false,
+        timestamp: Date.now() - 60000,
+      },
+    ],
+  },
+  {
+    id: "conv-fan-2",
+    name: "loyal_viewer_22",
+    username: "@loyal_viewer_22",
+    avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=viewer22",
+    type: "fan",
+    unread: 0,
+    messages: [
+      {
+        id: "m-f2-1",
+        text: "been following you since day 1! never stop posting ❤️",
+        sent: false,
+        timestamp: Date.now() - 43200000,
+      },
+    ],
+  },
+  {
+    id: "conv-fan-3",
+    name: "nightowl_watches",
+    username: "@nightowl_watches",
+    avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=nightowl",
+    type: "fan",
+    unread: 0,
+    messages: [
+      {
+        id: "m-f3-1",
+        text: "yesss this made my day, keep posting pls!!",
+        sent: false,
+        timestamp: Date.now() - 86400000,
+      },
+    ],
+  },
+  {
+    id: "conv-sys-1",
+    name: "MindForge Team",
+    username: "@mindforge",
+    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=mindforge",
+    type: "system",
+    unread: 0,
+    messages: [
+      {
+        id: "m-s1-1",
+        text: "Welcome to MindForge! Your account is verified and in good standing ✅",
+        sent: false,
+        timestamp: Date.now() - 604800000,
+      },
+    ],
+  },
+  {
+    id: "conv-sys-2",
+    name: "Platform Alerts",
+    username: "@platform",
+    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=platform",
+    type: "system",
+    unread: 1,
+    messages: [
+      {
+        id: "m-s2-1",
+        text: "New features are live in Creator Studio! Check out the updated Analytics dashboard.",
+        sent: false,
+        timestamp: Date.now() - 7200000,
       },
     ],
   },
@@ -649,11 +961,10 @@ const INITIAL_STORIES: Story[] = [
 ];
 
 const buildDailyEarnings = (): number[] => {
-  const base = [
+  return [
     22, 28, 31, 25, 34, 38, 29, 42, 36, 44, 38, 47, 41, 35, 50, 46, 52, 48, 55,
     43, 58, 61, 54, 66, 59, 63, 68, 72, 65, 78,
   ];
-  return base;
 };
 
 const buildMonthlyEarnings = (): number[] => [
@@ -715,6 +1026,211 @@ const INITIAL_MERCH: MerchProduct[] = [
   },
 ];
 
+// ---- V4 Phase 4 initial data ----
+
+const AI_HOUSE_NICHES = [
+  { niche: "Fitness", emoji: "💪" },
+  { niche: "Tech", emoji: "💻" },
+  { niche: "Comedy", emoji: "😂" },
+  { niche: "Fashion", emoji: "👗" },
+  { niche: "Gaming", emoji: "🎮" },
+  { niche: "Food", emoji: "🍕" },
+  { niche: "Travel", emoji: "✈️" },
+  { niche: "Education", emoji: "📚" },
+  { niche: "Music", emoji: "🎵" },
+  { niche: "Photography", emoji: "📸" },
+];
+
+const AI_HOUSE_NAMES = [
+  "PixelCreators",
+  "ViralVault",
+  "ContentKings",
+  "TrendSetters",
+  "ReachHouse",
+  "TheCreativeHive",
+  "NovaMakers",
+  "ZenithCollective",
+  "PulseCrew",
+  "EchoSquad",
+];
+
+function buildHouseMember(seed: string, followers: number): CreatorHouseMember {
+  return {
+    id: `hm-${seed}`,
+    name: seed.charAt(0).toUpperCase() + seed.slice(1),
+    username: `@${seed.toLowerCase()}`,
+    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`,
+    followers,
+  };
+}
+
+const INITIAL_HOUSES: CreatorHouse[] = AI_HOUSE_NAMES.map((name, i) => {
+  const memberCount = 4 + (i % 8);
+  const seeds = [
+    "nova",
+    "pulse",
+    "drift",
+    "orbit",
+    "flux",
+    "echo",
+    "arc",
+    "vibe",
+    "dawn",
+    "haze",
+    "lux",
+    "apex",
+  ];
+  const members: CreatorHouseMember[] = Array.from(
+    { length: memberCount },
+    (_, j) => {
+      const followerBase = 20000 + i * 40000 + j * 15000;
+      return buildHouseMember(seeds[(i * 4 + j) % seeds.length], followerBase);
+    },
+  );
+  const totalFollowers = members.reduce((s, m) => s + m.followers, 0);
+  const niche = AI_HOUSE_NICHES[i % AI_HOUSE_NICHES.length];
+  return {
+    id: `house-${i}`,
+    name,
+    emoji: niche.emoji,
+    niche: niche.niche,
+    members,
+    totalFollowers,
+    rank: i + 1,
+  };
+});
+
+function buildCompetitionLeaderboard(): CompetitionEntry[] {
+  const names = [
+    { name: "CreatorNova", username: "@creatornova", seed: "nova" },
+    { name: "MemeOrbit", username: "@memeorbit", seed: "orbit" },
+    { name: "FitPulse", username: "@fitpulse", seed: "pulse" },
+    { name: "LuxDrift", username: "@luxdrift", seed: "drift" },
+    { name: "EchoFlux", username: "@echoflux", seed: "flux" },
+  ];
+  return names.map((n, i) => ({
+    userId: `comp-ai-${i}`,
+    name: n.name,
+    username: n.username,
+    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${n.seed}`,
+    score: 250000 - i * 40000 + Math.floor(Math.random() * 10000),
+  }));
+}
+
+const INITIAL_COMPETITIONS: Competition[] = [
+  {
+    id: "comp-viral",
+    name: "Viral Post Contest",
+    emoji: "🔥",
+    type: "views",
+    joined: false,
+    leaderboard: buildCompetitionLeaderboard(),
+    weekEndsAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    reward: "+5,000 followers & Explorer Badge",
+  },
+  {
+    id: "comp-meme",
+    name: "Meme Battle",
+    emoji: "😂",
+    type: "shares",
+    joined: false,
+    leaderboard: buildCompetitionLeaderboard(),
+    weekEndsAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    reward: "+3,000 followers & Meme Lord Badge",
+  },
+  {
+    id: "comp-photo",
+    name: "Photography Challenge",
+    emoji: "📸",
+    type: "likes",
+    joined: false,
+    leaderboard: buildCompetitionLeaderboard(),
+    weekEndsAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    reward: "+2,000 followers & Lens Master Badge",
+  },
+];
+
+const INITIAL_CHALLENGES: WeeklyChallenge[] = [
+  {
+    id: "ch-followers",
+    title: "Grow Your Audience",
+    description: "Gain 5,000 new followers",
+    target: 5000,
+    current: 0,
+    completed: false,
+    reward: "+XP & Audience Builder Badge",
+    rewardClaimed: false,
+  },
+  {
+    id: "ch-explore",
+    title: "Hit the Explore Page",
+    description: "Get a post featured on Explore",
+    target: 1,
+    current: 0,
+    completed: false,
+    reward: "+1,500 followers & Explorer Badge",
+    rewardClaimed: false,
+  },
+  {
+    id: "ch-views",
+    title: "View Milestone",
+    description: "Reach 50,000 views on a single post",
+    target: 50000,
+    current: 0,
+    completed: false,
+    reward: "+XP & Viral Sensation Badge",
+    rewardClaimed: false,
+  },
+  {
+    id: "ch-hashtag",
+    title: "Start a Trend",
+    description: "Get your hashtag trending",
+    target: 1,
+    current: 0,
+    completed: false,
+    reward: "+2,000 followers & Trendsetter Badge",
+    rewardClaimed: false,
+  },
+];
+
+export const PLATFORM_EVENTS: PlatformEvent[] = [
+  {
+    id: "evt-glow",
+    hashtag: "#GlowUpChallenge",
+    label: "Posts using #GlowUpChallenge get 2x reach bonus!",
+    reachMultiplier: 2.0,
+    active: true,
+  },
+  {
+    id: "evt-viral",
+    hashtag: "#ViralMoment",
+    label: "Posts using #ViralMoment get 1.5x reach boost!",
+    reachMultiplier: 1.5,
+    active: false,
+  },
+  {
+    id: "evt-spotlight",
+    hashtag: "#CreatorSpotlight",
+    label: "#CreatorSpotlight posts get boosted Explore visibility!",
+    reachMultiplier: 1.3,
+    active: false,
+  },
+  {
+    id: "evt-trending",
+    hashtag: "#TrendingNow",
+    label: "#TrendingNow is the hot tag — join the wave!",
+    reachMultiplier: 1.4,
+    active: false,
+  },
+  {
+    id: "evt-drop",
+    hashtag: "#ContentDrop",
+    label: "Posts using #ContentDrop get 1.8x reach bonus!",
+    reachMultiplier: 1.8,
+    active: false,
+  },
+];
+
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -730,6 +1246,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     level: 3,
     niche: "Tech",
   });
+  const sessionStartFollowers = useRef(4820);
   const [posts, setPosts] = useState<PostItem[]>(INITIAL_POSTS);
   const postsRef = useRef<PostItem[]>(INITIAL_POSTS);
   postsRef.current = posts;
@@ -768,6 +1285,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [achievements, setAchievements] =
     useState<Achievement[]>(INITIAL_ACHIEVEMENTS);
   const [unreadDMs, setUnreadDMs] = useState(3);
+  const [hideMobileNav, setHideMobileNav] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     followersGainedToday: 142,
     totalLikesToday: 847,
@@ -787,6 +1305,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     useState<MerchProduct[]>(INITIAL_MERCH);
   const [currentRoute, setCurrentRoute] = useState<Route>({ page: "home" });
   const notifIdRef = useRef(10);
+
+  // V4 Phase 4 state
+  const [houses, setHouses] = useState<CreatorHouse[]>(INITIAL_HOUSES);
+  const [userHouseId, setUserHouseId] = useState<string | null>(null);
+  const [competitions, setCompetitions] =
+    useState<Competition[]>(INITIAL_COMPETITIONS);
+  const [weeklyChallenges, setWeeklyChallenges] =
+    useState<WeeklyChallenge[]>(INITIAL_CHALLENGES);
+  const [activePlatformEvent, setActivePlatformEvent] =
+    useState<PlatformEvent | null>(PLATFORM_EVENTS[0]);
+  const [shadowBan, setShadowBan] = useState<ShadowBan>({
+    active: false,
+    endsAt: 0,
+  });
+  // Phase 2 state
+  const initFans = Math.min(profile.followers, 4820);
+  const [fanLoyalty, setFanLoyalty] = useState<FanLoyalty>({
+    fans: Math.round(initFans * 0.6),
+    superFans: Math.round(initFans * 0.25),
+    vipFans: Math.round(initFans * 0.1),
+    ultraFans: Math.round(initFans * 0.05),
+  });
+  const [reputationScore, setReputationScore] = useState(50);
+  const [burnoutActive, setBurnoutActive] = useState(false);
+  const [coldAudienceActive, setColdAudienceActive] = useState(false);
+  const [contentSeries, setContentSeries] = useState<ContentSeries[]>([]);
+  const postTimestampsRef = useRef<number[]>([]);
+  const audienceRegions: AudienceRegions = {
+    northAmerica: 40,
+    europe: 28,
+    asia: 22,
+    southAmerica: 10,
+  };
 
   const navigate = useCallback((page: string, params?: Partial<Route>) => {
     setCurrentRoute({ page, ...params });
@@ -1013,12 +1564,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         likedByUser: false,
         savedByUser: false,
         isTrending: true,
+        watchTime: 65 + Math.floor(Math.random() * 25),
       };
       setPosts((prev) => [newPost, ...prev]);
       setPendingCollabs((prev) => prev.filter((c) => c.id !== collabId));
+
+      // Audience crossover: 1-5% of creator's followers follow user
+      const crossoverPct = 0.01 + Math.random() * 0.04;
+      const crossoverFollowers = Math.floor(
+        creator.followerCount * crossoverPct,
+      );
+      setProfile((prev) => ({
+        ...prev,
+        followers: prev.followers + crossoverFollowers,
+      }));
+
       addNotification({
         icon: "🚀",
-        message: `Collab post with ${creator.name} is live! Combined reach: ${Math.floor(combinedReach / 1000)}K`,
+        message: `Collab post with ${creator.name} is live! +${crossoverFollowers.toLocaleString()} new followers from audience crossover!`,
         type: "collab_accepted",
       });
     },
@@ -1055,6 +1618,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isTrending: sp.isTrending,
       viralStage: 0,
       viralScore: 0,
+      watchTime: 45 + Math.floor(Math.random() * 48),
     };
     setPosts((prev) => {
       if (prev.find((p) => p.id === sp.id)) return prev;
@@ -1062,6 +1626,89 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     return postItem;
   }, []);
+
+  // Phase 2 functions
+  const negotiateSponsorship = useCallback(
+    (dealId: string, multiplier: 1.25 | 1.5 | 2) => {
+      const accepted =
+        multiplier === 1.25
+          ? true
+          : multiplier === 1.5
+            ? Math.random() < 0.7
+            : Math.random() < 0.4;
+      setMonetization((prev) => {
+        const deal = prev.activeSponsorships.find((d) => d.id === dealId);
+        if (!deal) return prev;
+        if (accepted) {
+          const newValue = deal.dealValue * multiplier;
+          addNotification({
+            icon: "🤝",
+            message: `${deal.brandName} accepted your ${multiplier}x counter-offer! Deal secured for $${newValue.toLocaleString()}! 🎉`,
+            type: "sponsorship",
+          });
+          setReputationScore((prev) => Math.min(100, prev + 5));
+          return {
+            ...prev,
+            sponsorRevenue: prev.sponsorRevenue + newValue,
+            totalEarnings: prev.totalEarnings + newValue,
+            activeSponsorships: prev.activeSponsorships.map((d) =>
+              d.id === dealId
+                ? {
+                    ...d,
+                    dealValue: newValue,
+                    status: "active" as const,
+                    acceptedAt: Date.now(),
+                  }
+                : d,
+            ),
+          };
+        }
+        addNotification({
+          icon: "❌",
+          message: `${deal.brandName} rejected your ${multiplier}x counter-offer. The deal fell through.`,
+          type: "sponsorship",
+        });
+        return {
+          ...prev,
+          activeSponsorships: prev.activeSponsorships.filter(
+            (d) => d.id !== dealId,
+          ),
+        };
+      });
+    },
+    [addNotification],
+  );
+
+  const addPostToSeries = useCallback(
+    (postId: string, seriesName: string) => {
+      const trimmed = seriesName.trim();
+      if (!trimmed) return;
+      setContentSeries((prev) => {
+        const existing = prev.find(
+          (s) => s.name.toLowerCase() === trimmed.toLowerCase(),
+        );
+        if (existing) {
+          if (existing.postIds.length >= 1) {
+            addNotification({
+              icon: "📺",
+              message: `New episode of "${existing.name}" is live! Your audience will love it 🔥`,
+              type: "smart",
+            });
+          }
+          return prev.map((s) =>
+            s.id === existing.id
+              ? { ...s, postIds: [...s.postIds, postId] }
+              : s,
+          );
+        }
+        return [
+          ...prev,
+          { id: `series-${Date.now()}`, name: trimmed, postIds: [postId] },
+        ];
+      });
+    },
+    [addNotification],
+  );
 
   const boostFollowers = useCallback(
     (amount: number) => {
@@ -1084,6 +1731,238 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     [addNotification],
   );
+
+  // V4 Phase 4 actions
+  const joinHouse = useCallback(
+    (houseId: string) => {
+      const house = houses.find((h) => h.id === houseId);
+      if (!house) return;
+      setUserHouseId(houseId);
+      setHouses((prev) =>
+        prev.map((h) =>
+          h.id === houseId
+            ? {
+                ...h,
+                members: [
+                  ...h.members,
+                  {
+                    id: "user",
+                    name: profile.name,
+                    username: profile.username,
+                    avatar: profile.avatar,
+                    followers: profile.followers,
+                  },
+                ],
+                totalFollowers: h.totalFollowers + profile.followers,
+              }
+            : h,
+        ),
+      );
+      addNotification({
+        icon: "🏠",
+        message: `You joined ${house.name}! Welcome to the crew!`,
+        type: "house",
+      });
+    },
+    [houses, profile, addNotification],
+  );
+
+  const createHouse = useCallback(
+    (name: string, emoji: string, niche: string) => {
+      const newHouse: CreatorHouse = {
+        id: `house-user-${Date.now()}`,
+        name,
+        emoji,
+        niche,
+        members: [
+          {
+            id: "user",
+            name: profile.name,
+            username: profile.username,
+            avatar: profile.avatar,
+            followers: profile.followers,
+          },
+        ],
+        totalFollowers: profile.followers,
+        rank: houses.length + 1,
+      };
+      setHouses((prev) => [...prev, newHouse]);
+      setUserHouseId(newHouse.id);
+      addNotification({
+        icon: "🏠",
+        message: `${name} is now live! Start recruiting creators!`,
+        type: "house",
+      });
+    },
+    [houses, profile, addNotification],
+  );
+
+  const joinCompetition = useCallback(
+    (competitionId: string) => {
+      setCompetitions((prev) =>
+        prev.map((c) => {
+          if (c.id !== competitionId) return c;
+          const userEntry: CompetitionEntry = {
+            userId: "user",
+            name: profile.name,
+            username: profile.username,
+            avatar: profile.avatar,
+            score: 0,
+          };
+          return {
+            ...c,
+            joined: true,
+            leaderboard: [...c.leaderboard, userEntry].sort(
+              (a, b) => b.score - a.score,
+            ),
+          };
+        }),
+      );
+    },
+    [profile],
+  );
+
+  const claimChallengeReward = useCallback(
+    (challengeId: string) => {
+      const challenge = weeklyChallenges.find((c) => c.id === challengeId);
+      if (!challenge || !challenge.completed || challenge.rewardClaimed) return;
+      setWeeklyChallenges((prev) =>
+        prev.map((c) =>
+          c.id === challengeId ? { ...c, rewardClaimed: true } : c,
+        ),
+      );
+      setProfile((prev) => ({
+        ...prev,
+        xp: prev.xp + 500,
+        followers: prev.followers + 500,
+      }));
+      addNotification({
+        icon: "🎁",
+        message: `Challenge reward claimed: ${challenge.reward}`,
+        type: "achievement",
+      });
+    },
+    [weeklyChallenges, addNotification],
+  );
+
+  // Phase 2: Fan Loyalty upgrade simulation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFanLoyalty((prev) => {
+        const upgradeAmount = Math.floor(prev.fans * 0.005 + Math.random() * 3);
+        if (upgradeAmount < 1) return prev;
+        const upgradeToSuper = Math.max(0, Math.floor(upgradeAmount * 0.7));
+        const upgradeToVip = Math.max(0, Math.floor(prev.superFans * 0.003));
+        const upgradeToUltra = Math.max(0, Math.floor(prev.vipFans * 0.001));
+        if (upgradeToSuper > 0) {
+          addNotification({
+            icon: "⭐",
+            message: `${upgradeToSuper} fans upgraded to Super Fan! Your content is building loyalty!`,
+            type: "smart",
+          });
+        }
+        return {
+          fans: Math.max(0, prev.fans - upgradeToSuper),
+          superFans: prev.superFans + upgradeToSuper - upgradeToVip,
+          vipFans: prev.vipFans + upgradeToVip - upgradeToUltra,
+          ultraFans: prev.ultraFans + upgradeToUltra,
+        };
+      });
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [addNotification]);
+
+  // Phase 2: Burnout & cold audience system
+  useEffect(() => {
+    const coldTimer = setInterval(() => {
+      const timestamps = postTimestampsRef.current;
+      const now = Date.now();
+      const recentPosts = timestamps.filter((t) => now - t < 120000); // within 2 min (simulated)
+      if (recentPosts.length >= 4 && !burnoutActive) {
+        setBurnoutActive(true);
+        setReputationScore((prev) => Math.max(0, prev - 5));
+        addNotification({
+          icon: "🔥",
+          message:
+            "Burnout Warning 🔥 — you've been posting too fast! Your audience needs a break. Reach reduced.",
+          type: "smart",
+        });
+        setTimeout(() => setBurnoutActive(false), 180000);
+      }
+      const lastPost = timestamps[timestamps.length - 1];
+      if (lastPost && now - lastPost > 300000 && !coldAudienceActive) {
+        setColdAudienceActive(true);
+        addNotification({
+          icon: "❄️",
+          message:
+            "Your audience is getting cold ❄️ — post something to keep your engagement up!",
+          type: "smart",
+        });
+      } else if (lastPost && now - lastPost < 120000 && coldAudienceActive) {
+        setColdAudienceActive(false);
+      }
+    }, 30000);
+    return () => clearInterval(coldTimer);
+  }, [burnoutActive, coldAudienceActive, addNotification]);
+
+  // Smart notification scheduler
+  const smartNotifFiredRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const rand = (min: number, max: number) =>
+      Math.floor(Math.random() * (max - min + 1)) + min;
+
+    // "Best time to post" every 8-12 min
+    function schedulePostingTime() {
+      const t = setTimeout(
+        () => {
+          addNotification({
+            icon: "⏰",
+            message:
+              "Audience activity is peaking right now — great time to post!",
+            type: "smart",
+          });
+          schedulePostingTime();
+        },
+        rand(480000, 720000),
+      );
+      timers.push(t);
+    }
+    schedulePostingTime();
+
+    // "Audience active" every 10-15 min
+    function scheduleAudienceActive() {
+      const t = setTimeout(
+        () => {
+          addNotification({
+            icon: "🔥",
+            message: "Your audience is highly active right now — engage them!",
+            type: "smart",
+          });
+          scheduleAudienceActive();
+        },
+        rand(600000, 900000),
+      );
+      timers.push(t);
+    }
+    scheduleAudienceActive();
+
+    // Watch time alert after 5 min, once per session
+    const watchT = setTimeout(() => {
+      if (!smartNotifFiredRef.current.has("watch_time")) {
+        smartNotifFiredRef.current.add("watch_time");
+        addNotification({
+          icon: "👁",
+          message:
+            "Posts with high watch time are getting 2x reach today — keep them hooked!",
+          type: "smart",
+        });
+      }
+    }, 300000);
+    timers.push(watchT);
+
+    return () => timers.forEach(clearTimeout);
+  }, [addNotification]);
 
   const TWENTY_FOUR_MIN = 24 * 60 * 1000;
   const activeStories = stories.filter(
@@ -1109,6 +1988,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setAchievements,
         unreadDMs,
         setUnreadDMs,
+        hideMobileNav,
+        setHideMobileNav,
         analyticsData,
         setAnalyticsData,
         monetization,
@@ -1132,6 +2013,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addSimulatedPost,
         currentRoute,
         navigate,
+        houses,
+        setHouses,
+        userHouseId,
+        setUserHouseId,
+        competitions,
+        setCompetitions,
+        weeklyChallenges,
+        setWeeklyChallenges,
+        activePlatformEvent,
+        setActivePlatformEvent,
+        shadowBan,
+        setShadowBan,
+        audienceRegions,
+        joinHouse,
+        createHouse,
+        joinCompetition,
+        claimChallengeReward,
+        // Phase 2
+        fanLoyalty,
+        reputationScore,
+        burnoutActive,
+        coldAudienceActive,
+        contentSeries,
+        negotiateSponsorship,
+        addPostToSeries,
+        sessionStartFollowers: sessionStartFollowers.current,
       }}
     >
       {children}

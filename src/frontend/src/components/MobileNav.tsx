@@ -7,6 +7,7 @@ import {
   TrendingUp,
   Trophy,
   User,
+  Users,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
@@ -19,6 +20,7 @@ const navItems = [
   { id: "analytics", icon: BarChart2, ocid: "nav.analytics.link" },
   { id: "monetization", icon: DollarSign, ocid: "nav.monetization.link" },
   { id: "leaderboard", icon: Trophy, ocid: "nav.leaderboard.link" },
+  { id: "houses", icon: Users, ocid: "nav.houses.link" },
 ];
 
 interface Props {
@@ -31,7 +33,7 @@ export default function MobileNav({ activePage, onNavigate }: Props) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 flex"
+      className="fixed bottom-0 left-0 right-0 z-30 flex overflow-x-auto"
       style={{
         background: "oklch(0.13 0.016 280 / 0.97)",
         borderTop: "1px solid oklch(0.25 0.025 280 / 0.5)",
@@ -44,7 +46,7 @@ export default function MobileNav({ activePage, onNavigate }: Props) {
           key={id}
           data-ocid={ocid}
           onClick={() => onNavigate(id)}
-          className="flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 relative"
+          className="flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 relative min-w-[52px]"
         >
           <div className="relative">
             <Icon

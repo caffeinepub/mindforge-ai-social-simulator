@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Image, Send, X } from "lucide-react";
+import { Image, Send, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import PostCard from "../components/PostCard";
@@ -58,7 +58,7 @@ function PostStrengthMeter({ caption }: { caption: string }) {
           : "oklch(0.7 0.22 295)";
   const tip =
     hashtags.length < 2
-      ? "Tip: Add 2–4 hashtags for more reach"
+      ? "Tip: Add 2\u20134 hashtags for more reach"
       : caption.split(/\s+/).filter(Boolean).length < 5
         ? "Tip: Write a longer caption"
         : "Looking great! Post at peak hours for extra reach";
@@ -79,7 +79,85 @@ function PostStrengthMeter({ caption }: { caption: string }) {
           style={{ width: `${score}%`, background: color }}
         />
       </div>
-      <p className="text-xs text-muted-foreground">{tip}</p>
+      <p className="text-[11px] text-muted-foreground">{tip}</p>
+    </div>
+  );
+}
+
+function PlatformEventBanner({
+  onDismiss,
+  onUseTag,
+}: {
+  onDismiss: () => void;
+  onUseTag: (tag: string) => void;
+}) {
+  const { activePlatformEvent } = useApp();
+  if (!activePlatformEvent) return null;
+
+  return (
+    <div
+      data-ocid="feed.event.card"
+      className="relative rounded-2xl p-4 overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, oklch(0.28 0.08 295 / 0.9), oklch(0.22 0.06 240 / 0.9))",
+        border: "1px solid oklch(0.55 0.2 295 / 0.4)",
+        boxShadow: "0 0 30px oklch(0.55 0.2 295 / 0.15)",
+      }}
+    >
+      {/* Dismiss */}
+      <button
+        type="button"
+        data-ocid="feed.event.close_button"
+        onClick={onDismiss}
+        className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+        style={{ background: "oklch(0.2 0.04 280 / 0.5)" }}
+      >
+        <X className="w-3 h-3" />
+      </button>
+
+      <div className="flex items-start gap-3 pr-8">
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+          style={{ background: "oklch(0.55 0.25 295 / 0.3)" }}
+        >
+          <Sparkles className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span
+              className="text-xs font-bold uppercase tracking-wide"
+              style={{ color: "oklch(0.72 0.2 295)" }}
+            >
+              Active Event
+            </span>
+            <span
+              className="text-xs font-bold"
+              style={{ color: "oklch(0.88 0.12 295)" }}
+            >
+              {activePlatformEvent.hashtag}
+            </span>
+          </div>
+          <p className="text-sm text-white/90">{activePlatformEvent.label}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <Button
+          data-ocid="feed.event.primary_button"
+          size="sm"
+          className="gap-1.5 btn-gradient text-white border-none text-xs"
+          onClick={() => onUseTag(activePlatformEvent.hashtag)}
+        >
+          Use {activePlatformEvent.hashtag}
+        </Button>
+        <span
+          className="text-xs self-center"
+          style={{ color: "oklch(0.72 0.2 295)" }}
+        >
+          {activePlatformEvent.reachMultiplier}x reach multiplier
+        </span>
+      </div>
     </div>
   );
 }
@@ -92,8 +170,10 @@ export default function HomeFeed() {
     addNotification,
     stories,
     addSimulatedPost,
+    addPostToSeries,
   } = useApp();
   const [caption, setCaption] = useState("");
+  const [seriesInput, setSeriesInput] = useState("");
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailPost, setDetailPost] = useState<PostItem | null>(null);
@@ -101,6 +181,7 @@ export default function HomeFeed() {
     story: Story;
     index: number;
   } | null>(null);
+  const [eventDismissed, setEventDismissed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const simFeedPageRef = useRef(0);
@@ -188,6 +269,7 @@ export default function HomeFeed() {
       likedByUser: false,
       savedByUser: false,
       isTrending: false,
+      watchTime: 45 + Math.floor(Math.random() * 48),
     };
     setPosts((prev) => [newPost, ...prev]);
     addNotification({
@@ -195,9 +277,20 @@ export default function HomeFeed() {
       message: "You published a new post!",
       type: "like",
     });
-    toast.success("Post published! \ud83c\udf89");
+    if (seriesInput.trim()) {
+      addPostToSeries(newPost.id, seriesInput.trim());
+    }
+    toast.success("Post published! 🎉");
     setCaption("");
+    setSeriesInput("");
     setImagePreviews([]);
+  };
+
+  const handleUseTag = (tag: string) => {
+    setCaption((prev) =>
+      prev.includes(tag) ? prev : `${prev}${prev ? " " : ""}${tag}`,
+    );
+    toast.success(`${tag} added to your post!`);
   };
 
   const allFeedPosts = [...posts].sort((a, b) => {
@@ -211,6 +304,14 @@ export default function HomeFeed() {
 
   return (
     <div className="max-w-xl mx-auto space-y-5 py-6 px-4">
+      {/* Platform Event Banner */}
+      {!eventDismissed && (
+        <PlatformEventBanner
+          onDismiss={() => setEventDismissed(true)}
+          onUseTag={handleUseTag}
+        />
+      )}
+
       {!loading && (
         <div className="glass-card p-4">
           <StoryBar
@@ -240,6 +341,20 @@ export default function HomeFeed() {
         </div>
 
         {caption.trim().length > 0 && <PostStrengthMeter caption={caption} />}
+
+        <input
+          type="text"
+          data-ocid="post.series.input"
+          placeholder="📺 Add to series (optional, e.g. 'Morning Routine')"
+          value={seriesInput}
+          onChange={(e) => setSeriesInput(e.target.value)}
+          className="w-full text-xs rounded-lg px-3 py-2 outline-none transition-all"
+          style={{
+            background: "oklch(0.18 0.02 280 / 0.5)",
+            border: "1px solid oklch(0.3 0.025 280 / 0.4)",
+            color: "oklch(0.9 0.01 260)",
+          }}
+        />
 
         {imagePreviews.length > 0 && (
           <div className="flex gap-2 flex-wrap">

@@ -8,9 +8,11 @@ import {
   TrendingUp,
   Trophy,
   User,
+  Users,
   Zap,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
+import WeeklyChallenges from "./WeeklyChallenges";
 
 const navItems = [
   { id: "home", icon: Home, label: "Home", ocid: "nav.home.link" },
@@ -46,6 +48,12 @@ const navItems = [
     label: "Leaderboard",
     ocid: "nav.leaderboard.link",
   },
+  {
+    id: "houses",
+    icon: Users,
+    label: "Houses",
+    ocid: "nav.houses.link",
+  },
 ];
 
 interface Props {
@@ -58,7 +66,7 @@ export default function Sidebar({ activePage, onNavigate }: Props) {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-screen w-60 flex flex-col py-6 px-4 z-20"
+      className="fixed left-0 top-0 h-screen w-60 flex flex-col py-6 px-4 z-20 overflow-y-auto"
       style={{
         background: "oklch(0.13 0.016 280 / 0.95)",
         borderRight: "1px solid oklch(0.25 0.025 280 / 0.5)",
@@ -124,7 +132,10 @@ export default function Sidebar({ activePage, onNavigate }: Props) {
         })}
       </nav>
 
-      <div className="px-2 text-xs text-muted-foreground">
+      {/* Weekly Challenges widget */}
+      <WeeklyChallenges />
+
+      <div className="px-2 pt-3 text-xs text-muted-foreground">
         © {new Date().getFullYear()}.
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")}`}

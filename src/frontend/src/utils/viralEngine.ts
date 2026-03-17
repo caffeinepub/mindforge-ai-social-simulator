@@ -6,25 +6,37 @@ export const ALGORITHM_WEIGHTS = {
   saves: 1.5,
 };
 
-// Viral score formula using current weights
+// NEW viral score formula: watch-time-aware
+// viral_score = (engagement_rate × 0.20) + (shares × 0.35) +
+//               (saves × 0.20) + (watch_time_normalized × 0.30) + (comments × 0.15)
 export function computeViralScore(post: {
   likes: number;
   comments: { length: number };
   shares: number;
   saves: number;
   views: number;
+  watchTime?: number;
 }): number {
   const engRate =
     post.views > 0
       ? (post.likes + post.comments.length + post.shares) / post.views
       : 0;
-  return (
-    ALGORITHM_WEIGHTS.likes * post.likes +
-    ALGORITHM_WEIGHTS.comments * post.comments.length +
-    ALGORITHM_WEIGHTS.shares * post.shares +
-    ALGORITHM_WEIGHTS.saves * post.saves +
-    engRate * 1000
-  );
+
+  const watchNorm = (post.watchTime ?? 60) / 100; // normalize 0-100 to 0-1
+
+  // Core formula with weights
+  const baseScore =
+    engRate * 0.2 * 10000 +
+    post.shares * 0.35 * ALGORITHM_WEIGHTS.shares * 10 +
+    post.saves * 0.2 * ALGORITHM_WEIGHTS.saves * 10 +
+    watchNorm * 0.3 * 5000 +
+    post.comments.length * 0.15 * ALGORITHM_WEIGHTS.comments * 10;
+
+  // Watch time reach multiplier applied to score
+  const watchMultiplier =
+    (post.watchTime ?? 60) > 70 ? 1.2 : (post.watchTime ?? 60) < 40 ? 0.8 : 1.0;
+
+  return baseScore * watchMultiplier;
 }
 
 // Stage thresholds: score needed to reach each stage
@@ -111,7 +123,7 @@ export const ALGORITHM_UPDATE_EVENTS: {
     },
   },
   {
-    message: "Platform Update: Early engagement in the first hour is critical.",
+    message: "Platform Update: Watch time is now a key ranking signal.",
     apply: () => {
       ALGORITHM_WEIGHTS.shares = 4;
       ALGORITHM_WEIGHTS.comments = 3;

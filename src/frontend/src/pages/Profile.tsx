@@ -70,6 +70,11 @@ export default function Profile({ userId }: Props) {
     followUser,
     unfollowUser,
     addSimulatedPost,
+    shadowBan,
+    setShadowBan,
+    addNotification,
+    reputationScore,
+    contentSeries,
   } = useApp();
   const isOwnProfile = !userId;
 
@@ -91,6 +96,7 @@ export default function Profile({ userId }: Props) {
 
   const [editOpen, setEditOpen] = useState(false);
   const [boostOpen, setBoostOpen] = useState(false);
+  const [fakeFollowersOpen, setFakeFollowersOpen] = useState(false);
   const [detailPost, setDetailPost] = useState<PostItem | null>(null);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
@@ -169,6 +175,49 @@ export default function Profile({ userId }: Props) {
     reader.readAsDataURL(file);
   };
 
+  // Shadow ban countdown timer
+  const handleFakeFollowers = () => {
+    setProfile((prev) => ({ ...prev, followers: prev.followers + 50000 }));
+    setFakeFollowersOpen(false);
+    const roll = Math.random();
+    if (roll < 0.4) {
+      const endsAt = Date.now() + 180000;
+      setShadowBan({ active: true, endsAt });
+      addNotification({
+        icon: "⚠️",
+        message:
+          "Shadow ban activated! Your reach is reduced to 0.2x for 3 minutes.",
+        type: "shadow_ban",
+      });
+      toast.error("⚠️ Shadow banned! Reach reduced for 3 minutes.");
+    } else if (roll < 0.7) {
+      setTimeout(() => {
+        const purged = Math.floor(50000 * (0.3 + Math.random() * 0.3));
+        setProfile((prev) => ({
+          ...prev,
+          followers: Math.max(0, prev.followers - purged),
+        }));
+        addNotification({
+          icon: "⚠️",
+          message: `Follower purge detected! You lost ${purged.toLocaleString()} followers.`,
+          type: "shadow_ban",
+        });
+        toast.error(
+          `⚠️ Follower purge! -${purged.toLocaleString()} followers removed.`,
+        );
+      }, 10000);
+      toast.success("You gained 50,000 followers!");
+    } else {
+      toast.success("🍀 You got lucky! No penalties this time.");
+      addNotification({
+        icon: "🍀",
+        message:
+          "You got lucky! No penalties for buying fake followers this time.",
+        type: "boost",
+      });
+    }
+  };
+
   const handleBoost = (amount: number) => {
     boostFollowers(amount);
     toast.success(
@@ -212,7 +261,21 @@ export default function Profile({ userId }: Props) {
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">{displayProfile.name}</h1>
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <h1 className="text-2xl font-bold">{displayProfile.name}</h1>
+              {isOwnProfile && shadowBan.active && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-bold"
+                  style={{
+                    background: "oklch(0.6 0.2 25 / 0.2)",
+                    color: "oklch(0.72 0.18 25)",
+                    border: "1px solid oklch(0.6 0.2 25 / 0.4)",
+                  }}
+                >
+                  ⚠️ Shadow Banned
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground text-sm mb-2">
               {displayProfile.username}
             </p>
@@ -263,6 +326,20 @@ export default function Profile({ userId }: Props) {
                     onClick={() => setBoostOpen(true)}
                   >
                     <Zap className="w-3.5 h-3.5" /> Boost Followers
+                  </Button>
+                  <Button
+                    data-ocid="profile.fake_followers.open_modal_button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    style={{
+                      borderColor: "oklch(0.6 0.2 25 / 0.4)",
+                      color: "oklch(0.72 0.18 25)",
+                      background: "oklch(0.6 0.2 25 / 0.05)",
+                    }}
+                    onClick={() => setFakeFollowersOpen(true)}
+                  >
+                    ⚠️ Buy Fake Followers
                   </Button>
                 </>
               ) : (
@@ -343,6 +420,91 @@ export default function Profile({ userId }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Trust Score Badge */}
+      {isOwnProfile &&
+        (() => {
+          const tier =
+            reputationScore >= 80
+              ? {
+                  label: "Trusted Creator",
+                  color: "#eab308",
+                  bg: "oklch(0.72 0.2 65 / 0.15)",
+                  border: "oklch(0.72 0.2 65 / 0.35)",
+                  icon: "🏆",
+                }
+              : reputationScore >= 50
+                ? {
+                    label: "Rising Creator",
+                    color: "#6366f1",
+                    bg: "oklch(0.55 0.22 295 / 0.15)",
+                    border: "oklch(0.55 0.22 295 / 0.35)",
+                    icon: "⭐",
+                  }
+                : {
+                    label: "At Risk",
+                    color: "#ef4444",
+                    bg: "oklch(0.6 0.22 25 / 0.15)",
+                    border: "oklch(0.6 0.22 25 / 0.35)",
+                    icon: "⚠️",
+                  };
+          return (
+            <div
+              data-ocid="profile.trust_score.card"
+              className="glass-card p-4 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{tier.icon}</span>
+                <div>
+                  <p className="text-xs text-muted-foreground">Trust Score</p>
+                  <p
+                    className="text-sm font-bold"
+                    style={{ color: tier.color }}
+                  >
+                    {tier.label}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <p
+                    className="text-xl font-bold"
+                    style={{ color: tier.color }}
+                  >
+                    {reputationScore}
+                  </p>
+                  <p className="text-xs text-muted-foreground">/ 100</p>
+                </div>
+                <div className="w-16 h-16 relative">
+                  <svg
+                    aria-hidden="true"
+                    className="w-full h-full -rotate-90"
+                    viewBox="0 0 36 36"
+                  >
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.9"
+                      fill="none"
+                      stroke="oklch(0.22 0.02 280)"
+                      strokeWidth="3"
+                    />
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.9"
+                      fill="none"
+                      stroke={tier.color}
+                      strokeWidth="3"
+                      strokeDasharray={`${reputationScore} ${100 - reputationScore}`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       {/* Creator Level */}
       <div className="glass-card p-5">
@@ -430,6 +592,15 @@ export default function Profile({ userId }: Props) {
               <Bookmark className="w-3.5 h-3.5" /> Saved
             </TabsTrigger>
           )}
+          {isOwnProfile && contentSeries.length > 0 && (
+            <TabsTrigger
+              value="series"
+              data-ocid="profile.series.tab"
+              className="flex-1 gap-1.5"
+            >
+              📺 Series
+            </TabsTrigger>
+          )}
           {!isOwnProfile && (
             <TabsTrigger
               value="followers"
@@ -505,6 +676,91 @@ export default function Profile({ userId }: Props) {
                 ))}
               </div>
             )}
+          </TabsContent>
+        )}
+
+        {isOwnProfile && contentSeries.length > 0 && (
+          <TabsContent value="series">
+            <div className="space-y-4 mt-4" data-ocid="profile.series.panel">
+              {contentSeries.length === 0 ? (
+                <p
+                  data-ocid="profile.series.empty_state"
+                  className="text-muted-foreground text-sm text-center py-8"
+                >
+                  No series yet — add a post to a series when creating content!
+                </p>
+              ) : (
+                contentSeries.map((series, sIdx) => {
+                  const seriesPosts = posts.filter((p) =>
+                    series.postIds.includes(p.id),
+                  );
+                  return (
+                    <div
+                      key={series.id}
+                      data-ocid={`profile.series.item.${sIdx + 1}`}
+                      className="rounded-xl p-4"
+                      style={{
+                        background: "oklch(0.14 0.016 280 / 0.8)",
+                        border: "1px solid oklch(0.28 0.025 280 / 0.4)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="font-semibold text-sm">
+                            📺 {series.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {series.postIds.length} episode
+                            {series.postIds.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full"
+                          style={{
+                            background: "oklch(0.55 0.22 295 / 0.2)",
+                            color: "oklch(0.65 0.22 295)",
+                          }}
+                        >
+                          Series
+                        </span>
+                      </div>
+                      {seriesPosts.length > 0 ? (
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {seriesPosts.map((post, pIdx) => (
+                            <button
+                              key={post.id}
+                              type="button"
+                              data-ocid={`profile.series.item.${sIdx + 1}`}
+                              onClick={() => setDetailPost(post)}
+                              className="aspect-square rounded-lg overflow-hidden relative group"
+                            >
+                              <img
+                                src={post.imageUrl}
+                                alt=""
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                              <div
+                                className="absolute bottom-0 left-0 right-0 text-center text-[10px] font-bold py-0.5"
+                                style={{
+                                  background: "rgba(0,0,0,0.6)",
+                                  color: "white",
+                                }}
+                              >
+                                Ep.{pIdx + 1}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">
+                          Posts loading...
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </TabsContent>
         )}
 
@@ -831,6 +1087,81 @@ export default function Profile({ userId }: Props) {
               onClick={handleSave}
             >
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fake Followers / Shadow Ban Dialog */}
+      <Dialog open={fakeFollowersOpen} onOpenChange={setFakeFollowersOpen}>
+        <DialogContent
+          data-ocid="profile.fake_followers.dialog"
+          style={{
+            background: "oklch(0.15 0.018 280)",
+            border: "1px solid oklch(0.6 0.2 25 / 0.3)",
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              ⚠️ Risky Move!
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div
+              className="rounded-xl p-3 text-sm"
+              style={{
+                background: "oklch(0.6 0.2 25 / 0.1)",
+                border: "1px solid oklch(0.6 0.2 25 / 0.3)",
+                color: "oklch(0.82 0.12 40)",
+              }}
+            >
+              <p className="font-semibold mb-1">⚠️ Warning: High Risk</p>
+              <p className="text-xs leading-relaxed">
+                Buying fake followers may result in a{" "}
+                <strong>shadow ban</strong>, reduced reach (0.2x), or an
+                automatic <strong>follower purge</strong>. Proceed at your own
+                risk.
+              </p>
+            </div>
+            <div
+              className="rounded-xl p-4 flex items-center justify-between"
+              style={{
+                background: "oklch(0.18 0.02 280 / 0.5)",
+                border: "1px solid oklch(0.3 0.025 280 / 0.4)",
+              }}
+            >
+              <div>
+                <p className="font-semibold">+50,000 Followers</p>
+                <p className="text-xs text-muted-foreground">
+                  Instant delivery, zero cost
+                </p>
+              </div>
+              <span
+                className="text-2xl font-bold"
+                style={{ color: "oklch(0.72 0.18 145)" }}
+              >
+                FREE
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              data-ocid="profile.fake_followers.cancel_button"
+              variant="ghost"
+              onClick={() => setFakeFollowersOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              data-ocid="profile.fake_followers.confirm_button"
+              onClick={handleFakeFollowers}
+              style={{
+                background: "oklch(0.6 0.2 25 / 0.8)",
+                color: "white",
+                border: "none",
+              }}
+            >
+              Proceed Anyway
             </Button>
           </DialogFooter>
         </DialogContent>

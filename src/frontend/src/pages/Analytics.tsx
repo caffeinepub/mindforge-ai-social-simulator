@@ -4,7 +4,10 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -21,8 +24,15 @@ const tooltipStyle = {
   color: "oklch(0.97 0.01 260)",
 };
 
+const REGION_COLORS = [
+  "oklch(0.6 0.22 295)",
+  "oklch(0.65 0.2 210)",
+  "oklch(0.72 0.18 145)",
+  "oklch(0.72 0.2 50)",
+];
+
 export default function Analytics() {
-  const { analyticsData, posts } = useApp();
+  const { analyticsData, posts, audienceRegions, fanLoyalty } = useApp();
 
   const followerData = analyticsData.followerGrowth.map((v, i) => ({
     day: DAYS[i % DAYS.length],
@@ -38,6 +48,31 @@ export default function Analytics() {
 
   const topPost =
     posts.find((p) => p.id === analyticsData.topPostId) ?? posts[0];
+
+  const watchTimeData = posts
+    .filter((p) => p.watchTime !== undefined)
+    .map((p, i) => ({
+      name: `Post ${i + 1}`,
+      watchTime: p.watchTime as number,
+    }));
+
+  const avgWatchTime =
+    watchTimeData.length > 0
+      ? Math.round(
+          watchTimeData.reduce((acc, d) => acc + d.watchTime, 0) /
+            watchTimeData.length,
+        )
+      : 0;
+  const highRetention = watchTimeData.filter((d) => d.watchTime >= 70).length;
+  const completionRate =
+    avgWatchTime > 0 ? Math.min(100, Math.round(avgWatchTime * 0.85)) : 0;
+
+  const regionData = [
+    { name: "North America", value: audienceRegions.northAmerica },
+    { name: "Europe", value: audienceRegions.europe },
+    { name: "Asia", value: audienceRegions.asia },
+    { name: "South America", value: audienceRegions.southAmerica },
+  ];
 
   const statCards = [
     {
@@ -126,6 +161,67 @@ export default function Analytics() {
           </div>
         </div>
       )}
+
+      {/* Audience Regions */}
+      <div className="glass-card p-5">
+        <h2 className="font-semibold mb-1">🌍 Audience Regions</h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Best posting time: 2–6 PM EST for peak North American reach
+        </p>
+        <div className="flex flex-col sm:flex-row items-center gap-6">
+          <ResponsiveContainer width={180} height={180}>
+            <PieChart>
+              <Pie
+                data={regionData}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={80}
+                paddingAngle={3}
+                dataKey="value"
+              >
+                {regionData.map((entry, index) => (
+                  <Cell
+                    key={entry.name}
+                    fill={REGION_COLORS[index % REGION_COLORS.length]}
+                  />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(value: number) => [`${value}%`, "Share"]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="flex-1 space-y-2.5 w-full">
+            {regionData.map((region, i) => (
+              <div key={region.name}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">{region.name}</span>
+                  <span
+                    className="font-semibold"
+                    style={{ color: REGION_COLORS[i] }}
+                  >
+                    {region.value}%
+                  </span>
+                </div>
+                <div
+                  className="h-1.5 rounded-full overflow-hidden"
+                  style={{ background: "oklch(0.22 0.02 280)" }}
+                >
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${region.value}%`,
+                      background: REGION_COLORS[i],
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Follower Growth */}
       <div className="glass-card p-5">
@@ -265,6 +361,87 @@ export default function Analytics() {
         </ResponsiveContainer>
       </div>
 
+      {/* Watch Time & Retention */}
+      {watchTimeData.length > 0 && (
+        <div className="glass-card p-5">
+          <h2 className="font-semibold mb-1">👁 Watch Time & Retention</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Avg watch time: {avgWatchTime}% &nbsp;&middot;&nbsp; Completion
+            rate: {completionRate}%
+          </p>
+          <div className="grid grid-cols-3 gap-4 mb-5">
+            {[
+              {
+                label: "Avg Watch Time",
+                value: `${avgWatchTime}%`,
+                color: "oklch(0.65 0.2 210)",
+              },
+              {
+                label: "High Retention",
+                value: `${highRetention} posts`,
+                color: "oklch(0.72 0.18 145)",
+              },
+              {
+                label: "Completion Rate",
+                value: `${completionRate}%`,
+                color: "oklch(0.6 0.22 295)",
+              },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="text-center">
+                <p className="text-lg font-bold" style={{ color }}>
+                  {value}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{label}</p>
+              </div>
+            ))}
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={watchTimeData}>
+              <defs>
+                <linearGradient id="colorWatch" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor="oklch(0.65 0.2 210)"
+                    stopOpacity={1}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="oklch(0.6 0.22 295)"
+                    stopOpacity={0.6}
+                  />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="oklch(0.25 0.025 280 / 0.4)"
+              />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: "oklch(0.55 0.02 270)", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                domain={[0, 100]}
+                tick={{ fill: "oklch(0.55 0.02 270)", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                width={35}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(v: number) => [`${v}%`, "Watch Time"]}
+              />
+              <Bar
+                dataKey="watchTime"
+                fill="url(#colorWatch)"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Engagement Trends */}
       <div className="glass-card p-5">
         <h2 className="font-semibold mb-5">
@@ -332,6 +509,149 @@ export default function Analytics() {
             />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+      {/* Fan Loyalty Breakdown */}
+      <div className="glass-card p-5" data-ocid="analytics.fan_loyalty.card">
+        <h2 className="font-semibold mb-2">💜 Fan Loyalty Breakdown</h2>
+        <p className="text-xs text-muted-foreground mb-5">
+          Higher-tier fans contribute more engagement — Ultra Fans give 4x the
+          engagement weight.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie
+                data={[
+                  { name: "Fans", value: fanLoyalty.fans, color: "#6366f1" },
+                  {
+                    name: "Super Fans",
+                    value: fanLoyalty.superFans,
+                    color: "#8b5cf6",
+                  },
+                  {
+                    name: "VIP Fans",
+                    value: fanLoyalty.vipFans,
+                    color: "#06b6d4",
+                  },
+                  {
+                    name: "Ultra Fans",
+                    value: fanLoyalty.ultraFans,
+                    color: "#eab308",
+                  },
+                ]}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={85}
+                paddingAngle={3}
+                dataKey="value"
+              >
+                {[
+                  { name: "Fans", value: fanLoyalty.fans, color: "#6366f1" },
+                  {
+                    name: "Super Fans",
+                    value: fanLoyalty.superFans,
+                    color: "#8b5cf6",
+                  },
+                  {
+                    name: "VIP Fans",
+                    value: fanLoyalty.vipFans,
+                    color: "#06b6d4",
+                  },
+                  {
+                    name: "Ultra Fans",
+                    value: fanLoyalty.ultraFans,
+                    color: "#eab308",
+                  },
+                ].map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(v: number) => [v.toLocaleString(), ""]}
+              />
+              <Legend
+                wrapperStyle={{
+                  fontSize: "11px",
+                  color: "oklch(0.75 0.02 260)",
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="space-y-3">
+            {[
+              {
+                label: "Fans",
+                count: fanLoyalty.fans,
+                color: "#6366f1",
+                multiplier: "1x",
+                icon: "👤",
+              },
+              {
+                label: "Super Fans",
+                count: fanLoyalty.superFans,
+                color: "#8b5cf6",
+                multiplier: "2x",
+                icon: "⭐",
+              },
+              {
+                label: "VIP Fans",
+                count: fanLoyalty.vipFans,
+                color: "#06b6d4",
+                multiplier: "3x",
+                icon: "💎",
+              },
+              {
+                label: "Ultra Fans",
+                count: fanLoyalty.ultraFans,
+                color: "#eab308",
+                multiplier: "4x",
+                icon: "👑",
+              },
+            ].map((tier) => {
+              const total =
+                fanLoyalty.fans +
+                fanLoyalty.superFans +
+                fanLoyalty.vipFans +
+                fanLoyalty.ultraFans;
+              const pct =
+                total > 0 ? ((tier.count / total) * 100).toFixed(1) : "0.0";
+              return (
+                <div key={tier.label} className="flex items-center gap-3">
+                  <span className="text-xl w-7 flex-shrink-0">{tier.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold">
+                        {tier.label}
+                      </span>
+                      <span className="text-xs" style={{ color: tier.color }}>
+                        {tier.multiplier} engagement
+                      </span>
+                    </div>
+                    <div
+                      className="h-1.5 rounded-full"
+                      style={{ background: "oklch(0.22 0.02 280)" }}
+                    >
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, background: tier.color }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-0.5">
+                      <span className="text-[10px] text-muted-foreground">
+                        {tier.count.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {pct}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
