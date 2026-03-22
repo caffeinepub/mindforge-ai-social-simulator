@@ -10,6 +10,7 @@ import {
 import { AI_CREATORS } from "../utils/aiInfluencers";
 import type { AICreator } from "../utils/aiInfluencers";
 import type { SimulatedPostData } from "../utils/simulatedUsers";
+import { clearGameState, loadGameState, saveGameState } from "../utils/storage";
 
 export interface CommentReply {
   id: string;
@@ -274,6 +275,30 @@ export interface ContentSeries {
   postIds: string[];
 }
 
+export interface Skills {
+  contentQuality: number;
+  engagementBoost: number;
+  viralChance: number;
+  brandValue: number;
+}
+
+export interface AgencyState {
+  tier: "none" | "basic" | "premium" | "elite";
+  revenueBoostPct: number;
+  dealBoostPct: number;
+  growthBoostPct: number;
+}
+
+export interface InvestmentItem {
+  id: string;
+  type: "safe" | "risky";
+  amount: number;
+  expectedReturn: number;
+  startTime: number;
+  durationMs: number;
+  status: "active" | "completed" | "lost";
+}
+
 interface AppContextType {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
@@ -349,6 +374,34 @@ interface AppContextType {
   negotiateSponsorship: (id: string, multiplier: 1.25 | 1.5 | 2) => void;
   addPostToSeries: (postId: string, seriesName: string) => void;
   sessionStartFollowers: number;
+  // V5
+  isNewUser: boolean;
+  setIsNewUser: React.Dispatch<React.SetStateAction<boolean>>;
+  creatorCoins: number;
+  setCreatorCoins: React.Dispatch<React.SetStateAction<number>>;
+  lastSaved: number | null;
+  isSaving: boolean;
+  triggerSave: () => void;
+  newGame: () => void;
+  // V5 Pass 2
+  skills: Skills;
+  setSkills: React.Dispatch<React.SetStateAction<Skills>>;
+  agency: AgencyState;
+  setAgency: React.Dispatch<React.SetStateAction<AgencyState>>;
+  investments: InvestmentItem[];
+  setInvestments: React.Dispatch<React.SetStateAction<InvestmentItem[]>>;
+  loginStreak: number;
+  setLoginStreak: React.Dispatch<React.SetStateAction<number>>;
+  lastLoginDate: string;
+  setLastLoginDate: React.Dispatch<React.SetStateAction<string>>;
+  postingStreak: number;
+  setPostingStreak: React.Dispatch<React.SetStateAction<number>>;
+  lastPostTime: number;
+  setLastPostTime: React.Dispatch<React.SetStateAction<number>>;
+  dailyRewardClaimed: boolean;
+  setDailyRewardClaimed: React.Dispatch<React.SetStateAction<boolean>>;
+  lastRewardDate: string;
+  setLastRewardDate: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const SAMPLE_COMMENTS = [
@@ -1247,6 +1300,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     niche: "Tech",
   });
   const sessionStartFollowers = useRef(4820);
+  const [isNewUser, setIsNewUser] = useState<boolean>(() => {
+    const saved = loadGameState();
+    return !saved;
+  });
+  const [creatorCoins, setCreatorCoins] = useState<number>(100);
+  // V5 Pass 2 state
+  const [skills, setSkills] = useState<Skills>({
+    contentQuality: 1,
+    engagementBoost: 1,
+    viralChance: 1,
+    brandValue: 1,
+  });
+  const [agency, setAgency] = useState<AgencyState>({
+    tier: "none",
+    revenueBoostPct: 0,
+    dealBoostPct: 0,
+    growthBoostPct: 0,
+  });
+  const [investments, setInvestments] = useState<InvestmentItem[]>([]);
+  const [loginStreak, setLoginStreak] = useState<number>(0);
+  const [lastLoginDate, setLastLoginDate] = useState<string>("");
+  const [postingStreak, setPostingStreak] = useState<number>(0);
+  const [lastPostTime, setLastPostTime] = useState<number>(0);
+  const [dailyRewardClaimed, setDailyRewardClaimed] = useState<boolean>(false);
+  const [lastRewardDate, setLastRewardDate] = useState<string>("");
+
+  const [lastSaved, setLastSaved] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [posts, setPosts] = useState<PostItem[]>(INITIAL_POSTS);
   const postsRef = useRef<PostItem[]>(INITIAL_POSTS);
   postsRef.current = posts;
@@ -1338,6 +1420,186 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     asia: 22,
     southAmerica: 10,
   };
+
+  // V5: triggerSave and newGame
+  const stateForSaveRef = useRef<{
+    profile: UserProfile;
+    posts: PostItem[];
+    savedPosts: Set<string>;
+    likedPosts: Set<string>;
+    followedUserIds: Set<string>;
+    conversations: Conversation[];
+    achievements: Achievement[];
+    notifications: NotificationItem[];
+    unreadDMs: number;
+    analyticsData: AnalyticsData;
+    monetization: MonetizationData;
+    merchProducts: MerchProduct[];
+    houses: CreatorHouse[];
+    userHouseId: string | null;
+    competitions: Competition[];
+    weeklyChallenges: WeeklyChallenge[];
+    activePlatformEvent: PlatformEvent | null;
+    shadowBan: ShadowBan;
+    reputationScore: number;
+    burnoutActive: boolean;
+    coldAudienceActive: boolean;
+    contentSeries: ContentSeries[];
+    pendingCollabs: CollabRequest[];
+    creatorCoins: number;
+    skills: Skills;
+    agency: AgencyState;
+    investments: InvestmentItem[];
+    loginStreak: number;
+    lastLoginDate: string;
+    postingStreak: number;
+    lastPostTime: number;
+    dailyRewardClaimed: boolean;
+    lastRewardDate: string;
+  } | null>(null);
+
+  // V5 Pass 2: Login streak check on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount intentionally
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!lastLoginDate) {
+      setLastLoginDate(today);
+      setLoginStreak(1);
+      return;
+    }
+    if (lastLoginDate === today) return;
+    const last = new Date(lastLoginDate).getTime();
+    const nowMs = new Date(today).getTime();
+    const diffDays = Math.round((nowMs - last) / 86400000);
+    if (diffDays === 1) {
+      setLoginStreak((s) => s + 1);
+    } else {
+      setLoginStreak(1);
+    }
+    setLastLoginDate(today);
+    setDailyRewardClaimed(false);
+  }, []);
+
+  const triggerSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setIsSaving(true);
+    saveTimerRef.current = setTimeout(() => {
+      const s = stateForSaveRef.current;
+      if (s) {
+        saveGameState({
+          profile: s.profile,
+          posts: s.posts,
+          savedPosts: [...s.savedPosts],
+          likedPosts: [...s.likedPosts],
+          followedUserIds: [...s.followedUserIds],
+          notifications: s.notifications,
+          conversations: s.conversations,
+          achievements: s.achievements,
+          unreadDMs: s.unreadDMs,
+          analyticsData: s.analyticsData,
+          monetization: s.monetization,
+          merchProducts: s.merchProducts,
+          houses: s.houses,
+          userHouseId: s.userHouseId,
+          competitions: s.competitions,
+          weeklyChallenges: s.weeklyChallenges,
+          activePlatformEvent: s.activePlatformEvent,
+          shadowBan: s.shadowBan,
+          fanLoyalty: { fans: 0, superFans: 0, vipFans: 0, ultraFans: 0 },
+          reputationScore: s.reputationScore,
+          burnoutActive: s.burnoutActive,
+          coldAudienceActive: s.coldAudienceActive,
+          contentSeries: s.contentSeries,
+          pendingCollabs: s.pendingCollabs,
+          creatorCoins: s.creatorCoins,
+          skills: s.skills,
+          agency: s.agency,
+          investments: s.investments,
+          loginStreak: s.loginStreak,
+          lastLoginDate: s.lastLoginDate,
+          postingStreak: s.postingStreak,
+          lastPostTime: s.lastPostTime,
+          dailyRewardClaimed: s.dailyRewardClaimed,
+          lastRewardDate: s.lastRewardDate,
+          savedAt: Date.now(),
+        });
+      }
+      setIsSaving(false);
+      setLastSaved(Date.now());
+    }, 1500);
+  }, []);
+
+  // V5: Keep stateForSaveRef in sync with latest state for persistence
+  useEffect(() => {
+    stateForSaveRef.current = {
+      profile,
+      posts,
+      savedPosts,
+      likedPosts,
+      followedUserIds,
+      conversations,
+      achievements,
+      notifications,
+      unreadDMs,
+      analyticsData,
+      monetization,
+      merchProducts,
+      houses,
+      userHouseId,
+      competitions,
+      weeklyChallenges,
+      activePlatformEvent,
+      shadowBan,
+      reputationScore,
+      burnoutActive,
+      coldAudienceActive,
+      contentSeries,
+      pendingCollabs,
+      creatorCoins,
+      skills,
+      agency,
+      investments,
+      loginStreak,
+      lastLoginDate,
+      postingStreak,
+      lastPostTime,
+      dailyRewardClaimed,
+      lastRewardDate,
+    };
+  });
+
+  // V5: Auto-save every 3 seconds
+  useEffect(() => {
+    if (isNewUser) return;
+    const interval = setInterval(() => triggerSave(), 3000);
+    return () => clearInterval(interval);
+  }, [isNewUser, triggerSave]);
+
+  const newGame = useCallback(() => {
+    clearGameState();
+    setIsNewUser(true);
+    setCreatorCoins(100);
+    setSkills({
+      contentQuality: 1,
+      engagementBoost: 1,
+      viralChance: 1,
+      brandValue: 1,
+    });
+    setAgency({
+      tier: "none",
+      revenueBoostPct: 0,
+      dealBoostPct: 0,
+      growthBoostPct: 0,
+    });
+    setInvestments([]);
+    setLoginStreak(1);
+    setLastLoginDate(new Date().toISOString().slice(0, 10));
+    setPostingStreak(0);
+    setLastPostTime(0);
+    setDailyRewardClaimed(false);
+    setLastRewardDate("");
+    setLastSaved(null);
+  }, []);
 
   const navigate = useCallback((page: string, params?: Partial<Route>) => {
     setCurrentRoute({ page, ...params });
@@ -1529,6 +1791,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const [pendingCollabs, setPendingCollabs] = useState<CollabRequest[]>([]);
+
+  // V5: Load saved game state on first render
+  useEffect(() => {
+    const saved = loadGameState();
+    if (!saved) return;
+    setProfile(saved.profile as UserProfile);
+    setPosts(saved.posts as PostItem[]);
+    setSavedPosts(new Set(saved.savedPosts));
+    setLikedPosts(new Set(saved.likedPosts));
+    setFollowedUserIds(new Set(saved.followedUserIds));
+    setConversations(saved.conversations as Conversation[]);
+    setAchievements(saved.achievements as Achievement[]);
+    setMonetization(saved.monetization as MonetizationData);
+    setMerchProducts(saved.merchProducts as MerchProduct[]);
+    setHouses(saved.houses as CreatorHouse[]);
+    setUserHouseId(saved.userHouseId);
+    setCompetitions(saved.competitions as Competition[]);
+    setWeeklyChallenges(saved.weeklyChallenges as WeeklyChallenge[]);
+    setActivePlatformEvent(saved.activePlatformEvent as PlatformEvent | null);
+    setShadowBan(saved.shadowBan as ShadowBan);
+    if (typeof saved.reputationScore === "number")
+      setReputationScore(saved.reputationScore);
+    if (typeof saved.burnoutActive === "boolean")
+      setBurnoutActive(saved.burnoutActive);
+    if (typeof saved.coldAudienceActive === "boolean")
+      setColdAudienceActive(saved.coldAudienceActive);
+    setContentSeries(saved.contentSeries as ContentSeries[]);
+    setPendingCollabs(saved.pendingCollabs as CollabRequest[]);
+    if (typeof saved.creatorCoins === "number")
+      setCreatorCoins(saved.creatorCoins);
+    if (saved.skills) setSkills(saved.skills as Skills);
+    if (saved.agency) setAgency(saved.agency as AgencyState);
+    if (Array.isArray(saved.investments))
+      setInvestments(saved.investments as InvestmentItem[]);
+    if (typeof saved.loginStreak === "number")
+      setLoginStreak(saved.loginStreak);
+    if (typeof saved.lastLoginDate === "string")
+      setLastLoginDate(saved.lastLoginDate);
+    if (typeof saved.postingStreak === "number")
+      setPostingStreak(saved.postingStreak);
+    if (typeof saved.lastPostTime === "number")
+      setLastPostTime(saved.lastPostTime);
+    if (typeof saved.dailyRewardClaimed === "boolean")
+      setDailyRewardClaimed(saved.dailyRewardClaimed);
+    if (typeof saved.lastRewardDate === "string")
+      setLastRewardDate(saved.lastRewardDate);
+    if (saved.savedAt) setLastSaved(saved.savedAt);
+  }, []);
 
   const acceptCollab = useCallback(
     (collabId: string) => {
@@ -2039,6 +2349,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         negotiateSponsorship,
         addPostToSeries,
         sessionStartFollowers: sessionStartFollowers.current,
+        isNewUser,
+        setIsNewUser,
+        creatorCoins,
+        setCreatorCoins,
+        lastSaved,
+        isSaving,
+        triggerSave,
+        newGame,
+        // V5 Pass 2
+        skills,
+        setSkills,
+        agency,
+        setAgency,
+        investments,
+        setInvestments,
+        loginStreak,
+        setLoginStreak,
+        lastLoginDate,
+        setLastLoginDate,
+        postingStreak,
+        setPostingStreak,
+        lastPostTime,
+        setLastPostTime,
+        dailyRewardClaimed,
+        setDailyRewardClaimed,
+        lastRewardDate,
+        setLastRewardDate,
       }}
     >
       {children}

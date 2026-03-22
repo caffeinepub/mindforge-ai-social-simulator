@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import MobileNav from "./components/MobileNav";
 import NotificationsSidebar from "./components/NotificationsSidebar";
+import SaveIndicator from "./components/SaveIndicator";
 import Sidebar from "./components/Sidebar";
 import { AppProvider, useApp } from "./context/AppContext";
 import { useIsMobile } from "./hooks/use-mobile";
@@ -10,6 +11,7 @@ import { useEngagementSimulator } from "./hooks/useEngagementSimulator";
 import { useViralEngine } from "./hooks/useViralEngine";
 import Analytics from "./pages/Analytics";
 import CreatorHouses from "./pages/CreatorHouses";
+import CreatorHub from "./pages/CreatorHub";
 import Explore from "./pages/Explore";
 import HashtagPage from "./pages/HashtagPage";
 import HomeFeed from "./pages/HomeFeed";
@@ -17,16 +19,21 @@ import Leaderboard from "./pages/Leaderboard";
 import MerchStore from "./pages/MerchStore";
 import Messages from "./pages/Messages";
 import Monetization from "./pages/Monetization";
+import Onboarding from "./pages/Onboarding";
 import Profile from "./pages/Profile";
 import Trending from "./pages/Trending";
 
 function AppShell() {
-  const { currentRoute, navigate, hideMobileNav } = useApp();
+  const { currentRoute, navigate, hideMobileNav, isNewUser } = useApp();
   const isMobile = useIsMobile();
   useEngagementSimulator();
   useAIInfluencers();
   useViralEngine();
   useCollaborationSimulator();
+
+  if (isNewUser) {
+    return <Onboarding />;
+  }
 
   const activePage = currentRoute.page;
 
@@ -52,6 +59,12 @@ function AppShell() {
         return <Leaderboard />;
       case "houses":
         return <CreatorHouses />;
+      case "hub":
+        return <CreatorHub />;
+      case "creator-studio":
+        return <HomeFeed />; // placeholder until CreatorStudio page exists
+      case "challenges":
+        return <HomeFeed />; // placeholder
       case "user-profile":
         return <Profile userId={currentRoute.userId} />;
       case "hashtag":
@@ -82,6 +95,7 @@ function AppShell() {
       {isMobile && !hideMobileNav && (
         <MobileNav activePage={activePage} onNavigate={handleNavigate} />
       )}
+      <SaveIndicator />
       <Toaster
         position="top-right"
         toastOptions={{

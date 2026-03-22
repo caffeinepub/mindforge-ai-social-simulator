@@ -26,6 +26,7 @@ export function useEngagementSimulator() {
     setMonetization,
     profile,
     achievements,
+    skills,
   } = useApp();
   const postsRef = useRef(posts);
   postsRef.current = posts;
@@ -33,6 +34,8 @@ export function useEngagementSimulator() {
   profileRef.current = profile;
   const achievementsRef = useRef(achievements);
   achievementsRef.current = achievements;
+  const skillsRef = useRef(skills);
+  skillsRef.current = skills;
 
   // Engagement simulation
   useEffect(() => {
@@ -110,9 +113,25 @@ export function useEngagementSimulator() {
               : [];
           const newComments = [...post.comments, ...addedComments];
 
-          const newScore = newLikes + newComments.length * 2 + newShares * 3;
+          // Apply skill multipliers
+          const skillQuality = skillsRef.current.contentQuality;
+          const skillEngagement = skillsRef.current.engagementBoost;
+          const skillViral = skillsRef.current.viralChance;
+          const contentMult = 1 + (skillQuality - 1) * 0.15;
+          const engageMult = 1 + (skillEngagement - 1) * 0.1;
+          const boostedLikes = Math.floor(newLikes * engageMult);
+          const boostedShares = Math.floor(newShares * engageMult);
+          const viralThresholdReduction = (skillViral - 1) * 0.05;
+          const newScore =
+            boostedLikes + newComments.length * 2 + boostedShares * 3;
+          const isNowViralThreshold = Math.max(
+            0.3,
+            0.5 - viralThresholdReduction,
+          );
           const wasViral = post.isTrending;
-          const isNowViral = newScore > 500;
+          const isNowViral =
+            newScore > 500 ||
+            (newScore > 300 && Math.random() < isNowViralThreshold - 0.3);
 
           const followersFromShares =
             newShareDelta * (0.5 + Math.random() * 0.5);
@@ -175,11 +194,11 @@ export function useEngagementSimulator() {
 
           return {
             ...post,
-            likes: newLikes,
+            likes: Math.floor(newLikes * engageMult),
             comments: newComments,
-            shares: newShares,
+            shares: Math.floor(newShares * engageMult),
             views: newViews,
-            reach: newReach,
+            reach: Math.floor(newReach * contentMult),
             impressions: newImpressions,
             followersGained: post.followersGained + followersGainedDelta,
             engagementScore: newScore,

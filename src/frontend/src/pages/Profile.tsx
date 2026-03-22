@@ -58,6 +58,42 @@ interface Props {
   userId?: string;
 }
 
+function getRankInfo(followers: number): {
+  label: string;
+  color: string;
+  bg: string;
+} {
+  if (followers >= 1000000)
+    return {
+      label: "💎 Legend",
+      color: "oklch(0.82 0.2 295)",
+      bg: "oklch(0.22 0.06 295 / 0.3)",
+    };
+  if (followers >= 100000)
+    return {
+      label: "⭐ Celebrity",
+      color: "oklch(0.78 0.18 80)",
+      bg: "oklch(0.22 0.06 80 / 0.3)",
+    };
+  if (followers >= 10000)
+    return {
+      label: "🌟 Influencer",
+      color: "oklch(0.72 0.2 145)",
+      bg: "oklch(0.18 0.06 145 / 0.3)",
+    };
+  if (followers >= 1000)
+    return {
+      label: "📈 Rising Creator",
+      color: "oklch(0.72 0.18 220)",
+      bg: "oklch(0.18 0.05 220 / 0.3)",
+    };
+  return {
+    label: "🌱 Beginner",
+    color: "oklch(0.68 0.12 160)",
+    bg: "oklch(0.18 0.04 160 / 0.3)",
+  };
+}
+
 export default function Profile({ userId }: Props) {
   const {
     profile,
@@ -75,6 +111,7 @@ export default function Profile({ userId }: Props) {
     addNotification,
     reputationScore,
     contentSeries,
+    navigate,
   } = useApp();
   const isOwnProfile = !userId;
 
@@ -419,7 +456,59 @@ export default function Profile({ userId }: Props) {
             <p className="text-xs text-muted-foreground">Following</p>
           </button>
         </div>
+        {/* Rank Badge */}
+        {isOwnProfile &&
+          (() => {
+            const rank = getRankInfo(displayProfile.followers);
+            return (
+              <div className="flex justify-center mt-3">
+                <span
+                  className="text-xs font-bold px-3 py-1 rounded-full"
+                  style={{
+                    background: rank.bg,
+                    color: rank.color,
+                    border: `1px solid ${rank.color}40`,
+                  }}
+                >
+                  {rank.label}
+                </span>
+              </div>
+            );
+          })()}
       </div>
+
+      {/* Creator Hub Banner */}
+      {isOwnProfile && (
+        <button
+          type="button"
+          onClick={() => navigate("hub")}
+          data-ocid="profile.hub.button"
+          className="w-full rounded-2xl p-4 flex items-center gap-4 text-left transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.18 0.03 295 / 0.95), oklch(0.15 0.02 270 / 0.9))",
+            border: "1px solid oklch(0.35 0.12 295 / 0.4)",
+            boxShadow: "0 4px 24px oklch(0.4 0.2 295 / 0.15)",
+          }}
+        >
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.55 0.25 295), oklch(0.55 0.2 240))",
+            }}
+          >
+            ⚡
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-foreground">Creator Hub</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Analytics · Monetization · Studio · Leaderboard & more
+            </div>
+          </div>
+          <div className="text-muted-foreground text-xs px-2">→</div>
+        </button>
+      )}
 
       {/* Trust Score Badge */}
       {isOwnProfile &&

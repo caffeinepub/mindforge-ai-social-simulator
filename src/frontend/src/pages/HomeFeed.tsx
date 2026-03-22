@@ -171,6 +171,9 @@ export default function HomeFeed() {
     stories,
     addSimulatedPost,
     addPostToSeries,
+    setPostingStreak,
+    setLastPostTime,
+    lastPostTime,
   } = useApp();
   const [caption, setCaption] = useState("");
   const [seriesInput, setSeriesInput] = useState("");
@@ -280,6 +283,14 @@ export default function HomeFeed() {
     if (seriesInput.trim()) {
       addPostToSeries(newPost.id, seriesInput.trim());
     }
+    // Update posting streak
+    const now = Date.now();
+    if (lastPostTime > 0 && now - lastPostTime < 12 * 60 * 60 * 1000) {
+      setPostingStreak((s) => s + 1);
+    } else {
+      setPostingStreak(1);
+    }
+    setLastPostTime(now);
     toast.success("Post published! 🎉");
     setCaption("");
     setSeriesInput("");

@@ -1,39 +1,75 @@
-# MindForge AI Social Simulator
+# MindForge AI Social Simulator — V5 Pass 2
 
 ## Current State
-V4 Phase 1 (UI/UX + Messaging + Watch Time/Algorithm) is complete. The app has:
-- Full monetization page with sponsorships (accept/decline only, no negotiation)
-- Analytics page with region breakdown, watch time, follower growth
-- Fan tips simulated as notifications (no loyalty levels)
-- Smart notifications partially implemented
-- Brand deals fire as notifications but have no negotiation flow
-- AppContext tracks monetization, posts, followers, AI creators
+
+- `creatorCoins` state already exists (initialized at 100, saved/loaded from localStorage, shown in CreatorHub header)
+- CreatorHub is a grid launcher with 8 tiles; no tiles for Skills, Agency, Investment, or Streaks
+- No state fields exist for skill upgrades, agency, investment, streaks, or daily rewards
+- Burnout system exists using postTimestampsRef but no persistent streak counter
+- Rank/level system exists on profile.level but has no named rank titles in global state
+- Routes exist for all existing pages; no routes for new Pass 2 pages
 
 ## Requested Changes (Diff)
 
 ### Add
-1. **Brand Deal Negotiation** — On pending sponsorship cards in Monetization page, add three negotiation buttons (1.25x, 1.5x, 2x offer). Higher multipliers (2x) have a 40% rejection chance. Rejected negotiations show a notification and remove the deal. Accepted negotiations update the deal value and fire a success notification.
-2. **Fan Loyalty System** — 4 tiers: Fan, Super Fan, VIP Fan, Ultra Fan. Fans upgrade based on engagement over time (consistent posts = more upgrades). AppContext tracks `fanLoyalty: { fans, superFans, vipFans, ultraFans }`. Analytics page shows a fan loyalty breakdown chart (pie or bar). Notifications fire when fans upgrade (e.g., "12 fans upgraded to Super Fan!"). Higher-tier fans contribute more engagement multiplier.
-3. **Content Series System** — When creating a post, user can optionally mark it as part of a named series (e.g., "My Fitness Journey Part 1"). Series posts are grouped on the profile page under a "Series" tab. When a new part is posted, returning viewers (loyal/superfans) get a notification. Series posts receive a small retention bonus.
-4. **Reputation & Trust System** — Visible "Trust Score" (0–100) shown on the user's profile. Increases with: consistent posting, high engagement quality, accepted brand deals. Decreases with: spam behavior, fake follower purchase, shadow ban. Trust score affects reach multiplier (high trust = +20% reach, low trust = -30% reach). Small badge on profile (Trusted Creator / Rising Creator / At Risk).
-5. **Burnout & Consistency System** — Track posting frequency. Overposting (5+ posts in a short period) triggers a "Burnout Warning" notification and reduces reach by 20% temporarily. Inactivity (no posts for a long simulated period) triggers a "Your audience is getting cold" notification and starts a slow follower drop. Consistent posting (steady cadence) gives a +10% engagement bonus.
-6. **Smart Notification System** — Add context-aware notifications: "Best time to post right now", "Your audience is most active", "You're on a streak — keep posting!", "A post from yesterday is gaining traction". These fire based on simulated conditions (time of day simulation, post activity, engagement trends).
+- **State fields** in AppContext:
+  - `skills: { contentQuality: number; engagementBoost: number; viralChance: number; brandValue: number }` (each 1–5)
+  - `agency: { hired: boolean; tier: 'none' | 'basic' | 'premium' | 'elite'; revenueBoostPct: number; dealBoostPct: number; growthBoostPct: number }`
+  - `investments: Investment[]` where Investment = `{ id, type: 'safe'|'risky', amount, expectedReturn, startTime, durationMs, status: 'active'|'completed'|'lost' }`
+  - `loginStreak: number` (days), `lastLoginDate: string` (ISO date), `postingStreak: number`, `lastPostTime: number` (ms timestamp)
+  - `dailyRewardClaimed: boolean`, `lastRewardDate: string`
+  - `rank: string` (Beginner | Rising Creator | Influencer | Celebrity | Legend) derived from followers
+- **New page: SkillUpgrades** (`src/frontend/src/pages/SkillUpgrades.tsx`)
+  - 4 skill cards: Content Quality, Engagement Boost, Viral Chance, Brand Value
+  - Each skill has levels 1–5 shown as a progress bar/dots
+  - Upgrade cost increases per level (50, 100, 200, 400, 800 coins)
+  - Spend creatorCoins to upgrade; button disabled if insufficient coins
+  - Show current effect of each skill level
+- **New page: Agency** (`src/frontend/src/pages/AgencyPage.tsx`)
+  - Show current agent tier (None / Basic / Premium / Elite)
+  - 3 tier cards with costs (500, 1500, 3500 coins), benefits listed (revenue % boost, deal boost, growth boost)
+  - Hire/upgrade button; show active agent benefits if already hired
+  - Passive revenue accrues every 30s based on agent tier
+- **New page: Investment** (`src/frontend/src/pages/InvestmentPage.tsx`)
+  - Safe investment options: 3 tiers (100, 500, 1000 coins, 10–20% return over 5 min)
+  - Risky investment options: 3 tiers (200, 1000, 2500 coins, 50–100% return or total loss over 3 min)
+  - Active investments panel showing time remaining and expected return
+  - Completed investments show result (won/lost) with claim button
+- **New page: StreaksRewards** (`src/frontend/src/pages/StreaksRewards.tsx`)
+  - Login streak counter with 24h timer for next reward
+  - Posting streak counter with 12h countdown
+  - Daily reward claim button (active once per 24h)
+  - Reward tiers shown (streak day 1–7+ with increasing coin rewards)
+  - Grace period warning if streak about to break
+- **Routes** added to App.tsx: `skills`, `agency`, `investment`, `streaks`
+- **CreatorHub tiles** for all 4 new pages added to the hub grid
+- **Streak/daily reward check** on app load (compare lastLoginDate to today, award login reward, update streak)
+- **Posting streak update** when user creates a post (check lastPostTime, update postingStreak)
+- **Skill effects wired** into engagement simulator: contentQuality boosts viral score, engagementBoost multiplies engagement, viralChance increases viral probability, brandValue boosts brand deal payouts
+- **Rank display** on Profile page showing named rank based on followers
+- **Coins earned notifications** when passive income, investments complete, or daily reward claimed
 
 ### Modify
-- `Monetization.tsx` — Add negotiation buttons (1.25x, 1.5x, 2x) on pending sponsorship cards alongside the existing Accept button
-- `Analytics.tsx` — Add fan loyalty breakdown section (pie chart with 4 tiers + counts)
-- `AppContext.tsx` — Add `fanLoyalty` state, `reputationScore`, `burnoutStatus`, `negotiateSponsorship()`, `contentSeries[]`, `addToSeries()` actions
-- `Profile.tsx` — Show Trust Score badge and reputation tier; add Series tab to user's profile posts
-- Post creation UI — Add optional "Add to Series" input when creating posts
-- Notification system — Add smart notification triggers for posting time, streaks, traction alerts
+- `AppContext.tsx`: add all new state fields, initialize from localStorage, persist on save
+- `CreatorHub.tsx`: add 4 new tiles (Skills, Agency, Investment, Streaks & Rewards); update coins display
+- `App.tsx`: add 4 new routes
+- `Profile.tsx`: show rank badge/label derived from followers
+- `useEngagementSimulator.tsx`: incorporate skill multipliers into calculations
+- `HomeFeed.tsx` (post creation): update postingStreak on new post
 
 ### Remove
 - Nothing removed
 
 ## Implementation Plan
-1. Extend AppContext with: `fanLoyalty`, `reputationScore`, `burnoutStatus`, `contentSeries`, `negotiateSponsorship()`, `addPostToSeries()` — plus simulation logic for fan upgrades, reputation changes, burnout tracking, and smart notification timing
-2. Update Monetization.tsx: add negotiation buttons with risk logic on pending deals
-3. Update Analytics.tsx: add fan loyalty chart section
-4. Update Profile.tsx: show Trust Score badge, add Series tab
-5. Update post creation modal: add optional series field
-6. Wire smart notifications into the notification simulation loop
+
+1. Extend AppContext with all new state fields (skills, agency, investments, streaks, daily reward)
+2. Add streak/daily reward check logic on mount in AppContext
+3. Create SkillUpgrades page with 4 skill cards, upgrade costs, coin spending
+4. Create AgencyPage with 3 tier cards, hire logic, passive income interval
+5. Create InvestmentPage with safe/risky options, active investments, claim completed
+6. Create StreaksRewards page with login streak, posting streak, daily claim UI
+7. Wire skill multipliers into engagement simulator
+8. Add rank badge to Profile page
+9. Update CreatorHub with 4 new tiles
+10. Add 4 new routes to App.tsx
+11. Update posting streak on post creation in HomeFeed
