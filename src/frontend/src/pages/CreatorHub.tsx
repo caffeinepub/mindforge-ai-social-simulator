@@ -97,6 +97,13 @@ const HUB_FEATURES = [
     description: "Daily rewards & posting streaks",
     page: "streaks",
   },
+  {
+    id: "roulette",
+    emoji: "🎰",
+    label: "Viral Roulette",
+    description: "Spin to go viral or flop",
+    page: "viral-roulette",
+  },
 ];
 
 const GRADIENT_MAP: Record<string, string> = {
@@ -117,6 +124,8 @@ const GRADIENT_MAP: Record<string, string> = {
   investment:
     "linear-gradient(135deg, oklch(0.62 0.22 145), oklch(0.58 0.18 160))",
   streaks: "linear-gradient(135deg, oklch(0.68 0.22 50), oklch(0.62 0.2 30))",
+  roulette:
+    "linear-gradient(135deg, oklch(0.55 0.25 295), oklch(0.6 0.22 320))",
 };
 
 export default function CreatorHub() {

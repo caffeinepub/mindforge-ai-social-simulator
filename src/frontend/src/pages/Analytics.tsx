@@ -653,6 +653,196 @@ export default function Analytics() {
           </div>
         </div>
       </div>
+
+      {/* Story Performance Section */}
+      <StoryPerformanceSection />
+    </div>
+  );
+}
+
+function StoryPerformanceSection() {
+  const { stories } = useApp();
+  const userStories = stories.filter((s) => s.userId === "me");
+
+  if (userStories.length === 0) {
+    return (
+      <div className="glass-card p-5 space-y-3">
+        <h3 className="font-semibold text-foreground text-base">
+          \ud83d\udcf8 Story Performance
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Post your first story to see analytics here.
+        </p>
+      </div>
+    );
+  }
+
+  const totalViews = userStories.reduce(
+    (acc, s) => acc + (s.viewCount ?? 0),
+    0,
+  );
+  const avgViewRate =
+    userStories.reduce((acc, s) => acc + (s.viewRate ?? 0), 0) /
+    userStories.length;
+  const bestStory = [...userStories].sort(
+    (a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0),
+  )[0];
+  const avgRetention =
+    userStories.reduce((acc, s) => acc + (s.retentionScore ?? 0), 0) /
+    userStories.length;
+  const avgDelta =
+    userStories.reduce((acc, s) => acc + (s.performanceDelta ?? 0), 0) /
+    userStories.length;
+
+  const chartData = userStories.slice(-10).map((s, i) => ({
+    name: `Story ${i + 1}`,
+    views: s.viewCount ?? 0,
+  }));
+
+  const hour = new Date().getHours();
+  const bestTimeStr =
+    hour >= 18 && hour <= 22 ? "Now is great!" : "7 PM (peak engagement)";
+
+  return (
+    <div className="glass-card p-5 space-y-5">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-foreground text-base">
+          \ud83d\udcf8 Story Performance
+        </h3>
+        <span
+          className="text-xs px-2 py-0.5 rounded-full"
+          style={{
+            background: "oklch(0.28 0.06 295 / 0.5)",
+            color: "oklch(0.75 0.15 295)",
+          }}
+        >
+          {userStories.length} stories
+        </span>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          {
+            label: "Total Views",
+            value: totalViews.toLocaleString(),
+            icon: "\ud83d\udc41",
+          },
+          {
+            label: "Avg View Rate",
+            value: `${avgViewRate.toFixed(1)}%`,
+            icon: "\ud83d\udcc8",
+          },
+          {
+            label: "Best Story",
+            value: (bestStory?.viewCount ?? 0).toLocaleString(),
+            icon: "\ud83d\udd25",
+          },
+          {
+            label: "Avg Retention",
+            value: `${Math.round(avgRetention)}%`,
+            icon: "\u23f1",
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-2xl p-3 space-y-1"
+            style={{
+              background: "oklch(0.16 0.02 280 / 0.6)",
+              border: "1px solid oklch(0.28 0.025 280 / 0.4)",
+            }}
+          >
+            <span className="text-base">{stat.icon}</span>
+            <p className="text-lg font-bold text-foreground">{stat.value}</p>
+            <p className="text-[11px] text-muted-foreground">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Best story highlight */}
+      {bestStory && (
+        <div
+          className="rounded-2xl p-3 flex items-center gap-3"
+          style={{
+            background: "oklch(0.22 0.06 295 / 0.3)",
+            border: "1px solid oklch(0.45 0.15 295 / 0.3)",
+          }}
+        >
+          <span className="text-xl">\ud83c\udfc6</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground">
+              Best Performing Story
+            </p>
+            <p className="text-[10px] text-muted-foreground truncate">
+              {(bestStory.viewCount ?? 0).toLocaleString()} views ·{" "}
+              {(bestStory.viewRate ?? 0).toFixed(1)}% reach
+            </p>
+          </div>
+          <span
+            className="text-xs font-bold"
+            style={{
+              color:
+                (bestStory.performanceDelta ?? 0) >= 0
+                  ? "oklch(0.72 0.18 145)"
+                  : "oklch(0.65 0.2 25)",
+            }}
+          >
+            {(bestStory.performanceDelta ?? 0) >= 0 ? "+" : ""}
+            {(bestStory.performanceDelta ?? 0).toFixed(0)}%
+          </span>
+        </div>
+      )}
+
+      {/* Comparison line */}
+      <p className="text-xs text-muted-foreground">
+        {avgDelta >= 0
+          ? `\ud83d\udcc8 Your stories performed ${avgDelta.toFixed(0)}% better than average`
+          : `\u26a0\ufe0f Your stories performed ${Math.abs(avgDelta).toFixed(0)}% below average`}
+      </p>
+
+      {/* Best posting time */}
+      <div
+        className="rounded-xl px-3 py-2 flex items-center gap-2"
+        style={{ background: "oklch(0.2 0.04 295 / 0.4)" }}
+      >
+        <span className="text-sm">\ud83d\udcc5</span>
+        <p className="text-xs text-muted-foreground">
+          Best time to post stories:{" "}
+          <span className="text-foreground font-medium">{bestTimeStr}</span>
+        </p>
+      </div>
+
+      {/* Bar chart */}
+      {chartData.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">
+            Story Views (last {chartData.length})
+          </p>
+          <ResponsiveContainer width="100%" height={120}>
+            <BarChart
+              data={chartData}
+              margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="oklch(0.25 0.02 280 / 0.4)"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 9, fill: "oklch(0.55 0.04 280)" }}
+              />
+              <YAxis tick={{ fontSize: 9, fill: "oklch(0.55 0.04 280)" }} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Bar
+                dataKey="views"
+                radius={[4, 4, 0, 0]}
+                fill="oklch(0.6 0.22 295)"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }

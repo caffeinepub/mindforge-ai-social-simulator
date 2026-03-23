@@ -50,6 +50,12 @@ export interface SavedGameState {
   lastPostTime?: number;
   dailyRewardClaimed?: boolean;
   lastRewardDate?: string;
+  stories?: unknown[];
+  rivalCreator?: unknown;
+  dramaCount?: number;
+  fanRebellionActive?: boolean;
+  platformTakeoverActive?: boolean;
+  platformTakeoverEndsAt?: number | null;
   savedAt: number;
 }
 

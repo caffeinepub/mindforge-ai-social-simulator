@@ -1,75 +1,29 @@
-# MindForge AI Social Simulator — V5 Pass 2
+# MindForge AI Social Simulator — Batch 2
 
 ## Current State
-
-- `creatorCoins` state already exists (initialized at 100, saved/loaded from localStorage, shown in CreatorHub header)
-- CreatorHub is a grid launcher with 8 tiles; no tiles for Skills, Agency, Investment, or Streaks
-- No state fields exist for skill upgrades, agency, investment, streaks, or daily rewards
-- Burnout system exists using postTimestampsRef but no persistent streak counter
-- Rank/level system exists on profile.level but has no named rank titles in global state
-- Routes exist for all existing pages; no routes for new Pass 2 pages
+MindForge V5.1 is live with 80+ features including Live Streaming (Batch 1). The app has persistent LocalStorage save, PWA offline, 5-icon bottom nav, Creator Hub, Creator Coins, skill upgrades, AI creators, viral engine, analytics, messaging, and story system.
 
 ## Requested Changes (Diff)
 
 ### Add
-- **State fields** in AppContext:
-  - `skills: { contentQuality: number; engagementBoost: number; viralChance: number; brandValue: number }` (each 1–5)
-  - `agency: { hired: boolean; tier: 'none' | 'basic' | 'premium' | 'elite'; revenueBoostPct: number; dealBoostPct: number; growthBoostPct: number }`
-  - `investments: Investment[]` where Investment = `{ id, type: 'safe'|'risky', amount, expectedReturn, startTime, durationMs, status: 'active'|'completed'|'lost' }`
-  - `loginStreak: number` (days), `lastLoginDate: string` (ISO date), `postingStreak: number`, `lastPostTime: number` (ms timestamp)
-  - `dailyRewardClaimed: boolean`, `lastRewardDate: string`
-  - `rank: string` (Beginner | Rising Creator | Influencer | Celebrity | Legend) derived from followers
-- **New page: SkillUpgrades** (`src/frontend/src/pages/SkillUpgrades.tsx`)
-  - 4 skill cards: Content Quality, Engagement Boost, Viral Chance, Brand Value
-  - Each skill has levels 1–5 shown as a progress bar/dots
-  - Upgrade cost increases per level (50, 100, 200, 400, 800 coins)
-  - Spend creatorCoins to upgrade; button disabled if insufficient coins
-  - Show current effect of each skill level
-- **New page: Agency** (`src/frontend/src/pages/AgencyPage.tsx`)
-  - Show current agent tier (None / Basic / Premium / Elite)
-  - 3 tier cards with costs (500, 1500, 3500 coins), benefits listed (revenue % boost, deal boost, growth boost)
-  - Hire/upgrade button; show active agent benefits if already hired
-  - Passive revenue accrues every 30s based on agent tier
-- **New page: Investment** (`src/frontend/src/pages/InvestmentPage.tsx`)
-  - Safe investment options: 3 tiers (100, 500, 1000 coins, 10–20% return over 5 min)
-  - Risky investment options: 3 tiers (200, 1000, 2500 coins, 50–100% return or total loss over 3 min)
-  - Active investments panel showing time remaining and expected return
-  - Completed investments show result (won/lost) with claim button
-- **New page: StreaksRewards** (`src/frontend/src/pages/StreaksRewards.tsx`)
-  - Login streak counter with 24h timer for next reward
-  - Posting streak counter with 12h countdown
-  - Daily reward claim button (active once per 24h)
-  - Reward tiers shown (streak day 1–7+ with increasing coin rewards)
-  - Grace period warning if streak about to break
-- **Routes** added to App.tsx: `skills`, `agency`, `investment`, `streaks`
-- **CreatorHub tiles** for all 4 new pages added to the hub grid
-- **Streak/daily reward check** on app load (compare lastLoginDate to today, award login reward, update streak)
-- **Posting streak update** when user creates a post (check lastPostTime, update postingStreak)
-- **Skill effects wired** into engagement simulator: contentQuality boosts viral score, engagementBoost multiplies engagement, viralChance increases viral probability, brandValue boosts brand deal payouts
-- **Rank display** on Profile page showing named rank based on followers
-- **Coins earned notifications** when passive income, investments complete, or daily reward claimed
+- **Creator Drama Engine**: AI creators can call out the player, start beef, or copy their content. Player gets a notification with 3 choices (respond, ignore, escalate). Each choice affects reputation/trust score and follower count differently.
+- **Creator Rivalries**: One AI creator becomes the player's rival — tracks the player's stats, posts competitive content, and tries to outperform them. Rival is shown on Profile page with a head-to-head stats comparison.
+- **Fan Rebellion**: If the player hasn't posted in a long time or engagement drops severely, fans start unfollowing in waves with angry comments appearing in the feed. A "Calm Your Fans" action lets the player recover.
+- **Platform Takeover Events**: Rare random events where the algorithm goes haywire — any post can massively blow up or tank. Shown as a dramatic platform-wide banner with a countdown. During the event, viral scoring is randomized with extreme multipliers.
 
 ### Modify
-- `AppContext.tsx`: add all new state fields, initialize from localStorage, persist on save
-- `CreatorHub.tsx`: add 4 new tiles (Skills, Agency, Investment, Streaks & Rewards); update coins display
-- `App.tsx`: add 4 new routes
-- `Profile.tsx`: show rank badge/label derived from followers
-- `useEngagementSimulator.tsx`: incorporate skill multipliers into calculations
-- `HomeFeed.tsx` (post creation): update postingStreak on new post
+- `AppContext.tsx`: Add drama events state, rival creator state, fan rebellion state, and platform takeover event state. Integrate into persistence (LocalStorage).
+- `HomeFeed.tsx`: Show drama notifications, fan rebellion alerts, platform takeover banner.
+- `Profile.tsx`: Show rival creator comparison panel.
+- Notification system: Add drama/rivalry/rebellion/takeover notification types.
 
 ### Remove
-- Nothing removed
+- Nothing removed.
 
 ## Implementation Plan
-
-1. Extend AppContext with all new state fields (skills, agency, investments, streaks, daily reward)
-2. Add streak/daily reward check logic on mount in AppContext
-3. Create SkillUpgrades page with 4 skill cards, upgrade costs, coin spending
-4. Create AgencyPage with 3 tier cards, hire logic, passive income interval
-5. Create InvestmentPage with safe/risky options, active investments, claim completed
-6. Create StreaksRewards page with login streak, posting streak, daily claim UI
-7. Wire skill multipliers into engagement simulator
-8. Add rank badge to Profile page
-9. Update CreatorHub with 4 new tiles
-10. Add 4 new routes to App.tsx
-11. Update posting streak on post creation in HomeFeed
+1. Add drama/rival/rebellion/takeover state to AppContext with LocalStorage persistence.
+2. Drama Engine: Random timer triggers AI creator drama event → notification with 3 choices → outcome affects trust score + followers.
+3. Rivalry System: Assign one rival AI creator on first trigger, show on Profile as head-to-head stats card, rival posts more aggressively.
+4. Fan Rebellion: Monitor post frequency; if player hasn't posted in 30+ min (simulated inactivity), trigger rebellion wave — follower drop + angry comments. "Post Now" or "Calm Fans" button to stop it.
+5. Platform Takeover: Rare random event (every 20-40 min), dramatic banner with countdown in feed, viral multipliers go wild (0.1x to 50x) for 2 minutes.
+6. All events wired to notification system.

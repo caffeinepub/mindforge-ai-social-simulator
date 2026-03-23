@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Image, Send, Sparkles, X } from "lucide-react";
+import { Image, Send, Sparkles, Timer, X, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import PostCard from "../components/PostCard";
@@ -174,6 +174,11 @@ export default function HomeFeed() {
     setPostingStreak,
     setLastPostTime,
     lastPostTime,
+    navigate,
+    audienceMood,
+    fanRebellionActive,
+    platformTakeoverActive,
+    platformTakeoverEndsAt,
   } = useApp();
   const [caption, setCaption] = useState("");
   const [seriesInput, setSeriesInput] = useState("");
@@ -185,6 +190,7 @@ export default function HomeFeed() {
     index: number;
   } | null>(null);
   const [eventDismissed, setEventDismissed] = useState(false);
+  const [takeoverCountdown, setTakeoverCountdown] = useState<string>("2:00");
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const simFeedPageRef = useRef(0);
@@ -224,6 +230,23 @@ export default function HomeFeed() {
     if (bottomRef.current) observer.observe(bottomRef.current);
     return () => observer.disconnect();
   }, []);
+
+  // Platform takeover countdown
+  useEffect(() => {
+    if (!platformTakeoverActive || !platformTakeoverEndsAt) {
+      setTakeoverCountdown("2:00");
+      return;
+    }
+    function update() {
+      const remaining = Math.max(0, platformTakeoverEndsAt! - Date.now());
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      setTakeoverCountdown(`${mins}:${secs.toString().padStart(2, "0")}`);
+    }
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [platformTakeoverActive, platformTakeoverEndsAt]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).slice(
@@ -315,6 +338,122 @@ export default function HomeFeed() {
 
   return (
     <div className="max-w-xl mx-auto space-y-5 py-6 px-4">
+      {/* Fan Rebellion Banner */}
+      {fanRebellionActive && (
+        <div
+          data-ocid="feed.fan_rebellion.panel"
+          className="rounded-2xl px-4 py-3.5 flex items-center gap-3"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.22 0.08 25 / 0.85), oklch(0.2 0.07 5 / 0.85))",
+            border: "1px solid oklch(0.65 0.28 25 / 0.5)",
+            boxShadow: "0 0 30px oklch(0.55 0.28 25 / 0.3)",
+            animation: "rebellion-pulse 1.8s ease-in-out infinite",
+          }}
+        >
+          <span
+            className="text-2xl flex-shrink-0"
+            style={{ animation: "shake 0.5s ease-in-out infinite" }}
+          >
+            😡
+          </span>
+          <div className="flex-1 min-w-0">
+            <p
+              className="text-sm font-bold"
+              style={{ color: "oklch(0.88 0.22 25)" }}
+            >
+              ⚠️ Fan Rebellion Active!
+            </p>
+            <p
+              className="text-xs mt-0.5"
+              style={{ color: "oklch(0.72 0.16 25)" }}
+            >
+              Your fans are getting restless — you&apos;re losing followers
+              every 2 minutes. Post NOW to stop the bleed!
+            </p>
+          </div>
+          <button
+            type="button"
+            data-ocid="feed.fan_rebellion.post_button"
+            className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:scale-105"
+            style={{
+              background: "oklch(0.6 0.28 25)",
+              color: "white",
+            }}
+            onClick={() =>
+              document
+                .querySelector<HTMLTextAreaElement>(
+                  "[data-ocid='post.create.textarea']",
+                )
+                ?.focus()
+            }
+          >
+            Post Now
+          </button>
+        </div>
+      )}
+
+      {/* Platform Takeover Banner */}
+      {platformTakeoverActive && (
+        <div
+          data-ocid="feed.platform_takeover.panel"
+          className="rounded-2xl overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.18 0.06 25), oklch(0.16 0.05 10), oklch(0.2 0.06 40))",
+            border: "1px solid oklch(0.65 0.28 35 / 0.6)",
+            boxShadow:
+              "0 0 50px oklch(0.6 0.3 25 / 0.4), inset 0 1px 0 oklch(0.7 0.2 50 / 0.15)",
+          }}
+        >
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Zap
+                  className="w-5 h-5"
+                  style={{ color: "oklch(0.78 0.28 55)" }}
+                />
+                <span
+                  className="text-base font-black tracking-widest uppercase"
+                  style={{ color: "oklch(0.88 0.28 50)" }}
+                >
+                  ⚡ PLATFORM TAKEOVER
+                </span>
+              </div>
+              <div
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full"
+                style={{
+                  background: "oklch(0.22 0.08 25 / 0.6)",
+                  border: "1px solid oklch(0.65 0.28 25 / 0.4)",
+                }}
+              >
+                <Timer
+                  className="w-3.5 h-3.5"
+                  style={{ color: "oklch(0.75 0.28 25)" }}
+                />
+                <span
+                  className="text-base font-black tabular-nums"
+                  style={{ color: "oklch(0.88 0.28 25)" }}
+                >
+                  {takeoverCountdown}
+                </span>
+              </div>
+            </div>
+            <p className="text-sm" style={{ color: "oklch(0.78 0.12 50)" }}>
+              The algorithm has gone haywire! All posts get{" "}
+              <strong style={{ color: "oklch(0.88 0.28 50)" }}>10x–50x</strong>{" "}
+              viral multiplier for the next {takeoverCountdown}.
+            </p>
+            <p
+              className="text-xs mt-1.5 font-semibold"
+              style={{ color: "oklch(0.65 0.22 25)" }}
+            >
+              🔥 Post RIGHT NOW to ride the wave!
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Platform Event Banner */}
       {!eventDismissed && (
         <PlatformEventBanner
@@ -322,6 +461,76 @@ export default function HomeFeed() {
           onUseTag={handleUseTag}
         />
       )}
+
+      {/* Audience Mood Banner */}
+      {audienceMood === "hyped" && (
+        <div
+          data-ocid="feed.mood.panel"
+          className="rounded-2xl px-4 py-3 text-sm font-medium flex items-center gap-2"
+          style={{
+            background: "oklch(0.22 0.06 80 / 0.3)",
+            border: "1px solid oklch(0.65 0.2 80 / 0.3)",
+            color: "oklch(0.82 0.18 80)",
+          }}
+        >
+          😤 Your audience is <strong>HYPED!</strong> 🔥 Post now for max reach
+        </div>
+      )}
+      {audienceMood === "neutral" && (
+        <div
+          data-ocid="feed.mood.panel"
+          className="rounded-2xl px-4 py-3 text-sm flex items-center gap-2"
+          style={{
+            background: "oklch(0.16 0.02 280 / 0.5)",
+            border: "1px solid oklch(0.28 0.03 280 / 0.4)",
+            color: "oklch(0.6 0.04 280)",
+          }}
+        >
+          😐 Audience mood: Neutral
+        </div>
+      )}
+      {audienceMood === "bored" && (
+        <div
+          data-ocid="feed.mood.panel"
+          className="rounded-2xl px-4 py-3 text-sm font-medium flex items-center gap-2"
+          style={{
+            background: "oklch(0.2 0.05 230 / 0.3)",
+            border: "1px solid oklch(0.55 0.18 230 / 0.4)",
+            color: "oklch(0.72 0.18 230)",
+          }}
+        >
+          😴 ⚠️ Your audience is getting bored. Time to post!
+        </div>
+      )}
+      {audienceMood === "angry" && (
+        <div
+          data-ocid="feed.mood.panel"
+          className="rounded-2xl px-4 py-3 text-sm font-semibold flex items-center gap-2"
+          style={{
+            background: "oklch(0.2 0.06 25 / 0.3)",
+            border: "1px solid oklch(0.55 0.25 25 / 0.4)",
+            color: "oklch(0.72 0.22 25)",
+          }}
+        >
+          😡 🚨 Audience is angry! You haven't posted in too long.
+        </div>
+      )}
+
+      {/* Go Live button */}
+      <button
+        type="button"
+        data-ocid="feed.go_live.button"
+        onClick={() => navigate("live-stream")}
+        className="w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold transition-all hover:scale-[1.01] active:scale-[0.99]"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.55 0.28 25 / 0.2), oklch(0.5 0.25 10 / 0.2))",
+          border: "1px solid oklch(0.55 0.28 25 / 0.4)",
+          color: "oklch(0.75 0.22 25)",
+        }}
+      >
+        🔴 Go Live
+      </button>
 
       {!loading && (
         <div className="glass-card p-4">

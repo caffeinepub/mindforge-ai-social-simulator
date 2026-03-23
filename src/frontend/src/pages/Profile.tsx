@@ -112,6 +112,8 @@ export default function Profile({ userId }: Props) {
     reputationScore,
     contentSeries,
     navigate,
+    audienceMood,
+    rivalCreator,
   } = useApp();
   const isOwnProfile = !userId;
 
@@ -378,6 +380,19 @@ export default function Profile({ userId }: Props) {
                   >
                     ⚠️ Buy Fake Followers
                   </Button>
+                  <Button
+                    data-ocid="profile.go_live.button"
+                    size="sm"
+                    className="gap-1.5 text-xs text-white border-none"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, oklch(0.55 0.28 25), oklch(0.5 0.25 10))",
+                      boxShadow: "0 2px 12px oklch(0.55 0.28 25 / 0.4)",
+                    }}
+                    onClick={() => navigate("live-stream")}
+                  >
+                    🔴 Go Live
+                  </Button>
                 </>
               ) : (
                 <Button
@@ -478,6 +493,153 @@ export default function Profile({ userId }: Props) {
       </div>
 
       {/* Creator Hub Banner */}
+      {/* Rival Creator Card */}
+      {isOwnProfile && rivalCreator && (
+        <div
+          className="glass-card p-4"
+          data-ocid="profile.rival.card"
+          style={{
+            border: "1px solid oklch(0.65 0.25 25 / 0.3)",
+            boxShadow: "0 0 30px oklch(0.55 0.25 25 / 0.1)",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-base">🔥</span>
+            <h3
+              className="font-bold text-sm uppercase tracking-wide"
+              style={{ color: "oklch(0.75 0.25 25)" }}
+            >
+              Your Rival
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-3 mb-4">
+            <div className="relative">
+              <Avatar className="w-12 h-12">
+                <AvatarImage
+                  src={rivalCreator.avatar}
+                  alt={rivalCreator.name}
+                />
+                <AvatarFallback>{rivalCreator.name[0]}</AvatarFallback>
+              </Avatar>
+              <span className="absolute -top-1 -right-1 text-sm">😤</span>
+            </div>
+            <div>
+              <p className="font-bold text-sm">{rivalCreator.name}</p>
+              <p className="text-xs" style={{ color: "oklch(0.55 0.04 280)" }}>
+                {rivalCreator.username} · {rivalCreator.niche}
+              </p>
+            </div>
+            <div className="ml-auto">
+              {profile.followers > rivalCreator.followerCount * 1.1 ? (
+                <span
+                  className="text-xs font-bold px-2.5 py-1 rounded-full"
+                  style={{
+                    background: "oklch(0.18 0.06 145 / 0.4)",
+                    border: "1px solid oklch(0.55 0.22 145 / 0.4)",
+                    color: "oklch(0.72 0.22 145)",
+                  }}
+                >
+                  You&apos;re ahead 🏆
+                </span>
+              ) : Math.abs(profile.followers - rivalCreator.followerCount) /
+                  Math.max(profile.followers, 1) <
+                0.1 ? (
+                <span
+                  className="text-xs font-bold px-2.5 py-1 rounded-full"
+                  style={{
+                    background: "oklch(0.18 0.06 80 / 0.4)",
+                    border: "1px solid oklch(0.65 0.22 80 / 0.4)",
+                    color: "oklch(0.78 0.22 80)",
+                  }}
+                >
+                  Neck and neck ⚡
+                </span>
+              ) : (
+                <span
+                  className="text-xs font-bold px-2.5 py-1 rounded-full"
+                  style={{
+                    background: "oklch(0.18 0.06 25 / 0.4)",
+                    border: "1px solid oklch(0.55 0.22 25 / 0.4)",
+                    color: "oklch(0.72 0.22 25)",
+                  }}
+                >
+                  Rival winning 😤
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Stats comparison */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              {
+                label: "Followers",
+                you: profile.followers,
+                rival: rivalCreator.followerCount,
+                fmt: (v: number) =>
+                  v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toString(),
+              },
+              {
+                label: "Posts",
+                you: posts.filter((p) => p.authorUsername === profile.username)
+                  .length,
+                rival: rivalCreator.postsCount,
+                fmt: (v: number) => v.toString(),
+              },
+              {
+                label: "Engagement",
+                you: Math.round(
+                  posts
+                    .filter((p) => p.authorUsername === profile.username)
+                    .reduce((s, p) => s + p.engagementScore, 0) / 100,
+                ),
+                rival: Math.round(rivalCreator.engagementScore),
+                fmt: (v: number) =>
+                  v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toString(),
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="col-span-1 rounded-xl p-3 last:col-span-2"
+                style={{
+                  background: "oklch(0.16 0.02 280 / 0.5)",
+                  border: "1px solid oklch(0.28 0.03 280 / 0.4)",
+                }}
+              >
+                <p
+                  className="text-xs mb-2"
+                  style={{ color: "oklch(0.55 0.04 280)" }}
+                >
+                  {stat.label}
+                </p>
+                <div className="flex items-center justify-between text-xs">
+                  <div className="text-center">
+                    <p
+                      className="font-bold text-sm"
+                      style={{ color: "oklch(0.82 0.2 295)" }}
+                    >
+                      {stat.fmt(stat.you)}
+                    </p>
+                    <p style={{ color: "oklch(0.55 0.04 280)" }}>You</p>
+                  </div>
+                  <span style={{ color: "oklch(0.4 0.04 280)" }}>vs</span>
+                  <div className="text-center">
+                    <p
+                      className="font-bold text-sm"
+                      style={{ color: "oklch(0.72 0.22 25)" }}
+                    >
+                      {stat.fmt(stat.rival)}
+                    </p>
+                    <p style={{ color: "oklch(0.55 0.04 280)" }}>Rival</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isOwnProfile && (
         <button
           type="button"
@@ -864,6 +1026,38 @@ export default function Profile({ userId }: Props) {
                 View {displayProfile.followers.toLocaleString()} followers
               </button>
             </div>
+            {isOwnProfile && (
+              <span
+                className="text-xs px-2.5 py-1 rounded-full font-medium"
+                style={{
+                  background:
+                    audienceMood === "hyped"
+                      ? "oklch(0.22 0.06 80 / 0.3)"
+                      : audienceMood === "angry"
+                        ? "oklch(0.2 0.06 25 / 0.3)"
+                        : audienceMood === "bored"
+                          ? "oklch(0.2 0.05 230 / 0.3)"
+                          : "oklch(0.16 0.02 280 / 0.5)",
+                  color:
+                    audienceMood === "hyped"
+                      ? "oklch(0.78 0.18 80)"
+                      : audienceMood === "angry"
+                        ? "oklch(0.72 0.22 25)"
+                        : audienceMood === "bored"
+                          ? "oklch(0.72 0.18 230)"
+                          : "oklch(0.55 0.04 280)",
+                  border: "1px solid currentColor",
+                }}
+              >
+                {audienceMood === "hyped"
+                  ? "😤 Hyped"
+                  : audienceMood === "angry"
+                    ? "😡 Angry"
+                    : audienceMood === "bored"
+                      ? "😴 Bored"
+                      : "😐 Neutral"}
+              </span>
+            )}
           </TabsContent>
         )}
       </Tabs>

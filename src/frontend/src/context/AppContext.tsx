@@ -59,15 +59,34 @@ export interface PostItem {
   watchTime?: number;
 }
 
+export interface StoryReply {
+  id: string;
+  username: string;
+  avatar: string;
+  text: string;
+  createdAt: number;
+}
+
 export interface Story {
   id: string;
   userId: string;
   username: string;
   avatar: string;
   imageUrl: string;
+  textContent?: string;
+  storyType: "image" | "text";
+  bgColor?: string;
   createdAt: number;
+  expiresAt: number;
   viewCount: number;
+  viewRate: number;
+  retentionScore: number;
+  peakReached: boolean;
+  performanceDelta: number;
   viewed: boolean;
+  reactions: { fire: number; heart: number; laugh: number };
+  userReaction: "fire" | "heart" | "laugh" | null;
+  replies: StoryReply[];
 }
 
 export interface NotificationItem {
@@ -299,6 +318,8 @@ export interface InvestmentItem {
   status: "active" | "completed" | "lost";
 }
 
+export type AudienceMood = "hyped" | "neutral" | "bored" | "angry";
+
 interface AppContextType {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
@@ -337,6 +358,8 @@ interface AppContextType {
   followUser: (userId: string) => void;
   unfollowUser: (userId: string) => void;
   addStory: (story: Story) => void;
+  reactToStory: (storyId: string, reaction: "fire" | "heart" | "laugh") => void;
+  replyToStory: (storyId: string, text: string) => void;
   addCommentReply: (
     postId: string,
     commentId: string,
@@ -402,6 +425,21 @@ interface AppContextType {
   setDailyRewardClaimed: React.Dispatch<React.SetStateAction<boolean>>;
   lastRewardDate: string;
   setLastRewardDate: React.Dispatch<React.SetStateAction<string>>;
+  audienceMood: AudienceMood;
+  setAudienceMood: React.Dispatch<React.SetStateAction<AudienceMood>>;
+  // Batch 2
+  rivalCreator: AICreator | null;
+  setRivalCreator: React.Dispatch<React.SetStateAction<AICreator | null>>;
+  dramaCount: number;
+  setDramaCount: React.Dispatch<React.SetStateAction<number>>;
+  fanRebellionActive: boolean;
+  setFanRebellionActive: React.Dispatch<React.SetStateAction<boolean>>;
+  platformTakeoverActive: boolean;
+  setPlatformTakeoverActive: React.Dispatch<React.SetStateAction<boolean>>;
+  platformTakeoverEndsAt: number | null;
+  setPlatformTakeoverEndsAt: React.Dispatch<
+    React.SetStateAction<number | null>
+  >;
 }
 
 export const SAMPLE_COMMENTS = [
@@ -977,9 +1015,18 @@ const INITIAL_STORIES: Story[] = [
     username: "@samchen",
     avatar: SAMPLE_AVATARS[0],
     imageUrl: "https://picsum.photos/seed/story1/400/700",
+    storyType: "image" as const,
     createdAt: Date.now() - 300000,
+    expiresAt: Date.now() - 300000 + 24 * 60 * 60 * 1000,
     viewCount: 842,
+    viewRate: 8.4,
+    retentionScore: 72,
+    peakReached: true,
+    performanceDelta: 5,
     viewed: false,
+    reactions: { fire: 12, heart: 8, laugh: 3 },
+    userReaction: null,
+    replies: [],
   },
   {
     id: "s2",
@@ -987,9 +1034,18 @@ const INITIAL_STORIES: Story[] = [
     username: "@miatorres",
     avatar: SAMPLE_AVATARS[1],
     imageUrl: "https://picsum.photos/seed/story2/400/700",
+    storyType: "image" as const,
     createdAt: Date.now() - 900000,
+    expiresAt: Date.now() - 900000 + 24 * 60 * 60 * 1000,
     viewCount: 1204,
+    viewRate: 12.0,
+    retentionScore: 65,
+    peakReached: true,
+    performanceDelta: 15,
     viewed: false,
+    reactions: { fire: 20, heart: 15, laugh: 5 },
+    userReaction: null,
+    replies: [],
   },
   {
     id: "s3",
@@ -997,9 +1053,18 @@ const INITIAL_STORIES: Story[] = [
     username: "@jordankim",
     avatar: SAMPLE_AVATARS[2],
     imageUrl: "https://picsum.photos/seed/story3/400/700",
+    storyType: "image" as const,
     createdAt: Date.now() - 1800000,
+    expiresAt: Date.now() - 1800000 + 24 * 60 * 60 * 1000,
     viewCount: 567,
+    viewRate: 5.7,
+    retentionScore: 58,
+    peakReached: false,
+    performanceDelta: -10,
     viewed: true,
+    reactions: { fire: 5, heart: 3, laugh: 1 },
+    userReaction: null,
+    replies: [],
   },
   {
     id: "s4",
@@ -1007,9 +1072,18 @@ const INITIAL_STORIES: Story[] = [
     username: "@rileylee",
     avatar: SAMPLE_AVATARS[3],
     imageUrl: "https://picsum.photos/seed/story4/400/700",
+    storyType: "image" as const,
     createdAt: Date.now() - 600000,
+    expiresAt: Date.now() - 600000 + 24 * 60 * 60 * 1000,
     viewCount: 2341,
+    viewRate: 23.4,
+    retentionScore: 80,
+    peakReached: true,
+    performanceDelta: 22,
     viewed: false,
+    reactions: { fire: 40, heart: 30, laugh: 10 },
+    userReaction: null,
+    replies: [],
   },
 ];
 
@@ -1325,6 +1399,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [lastPostTime, setLastPostTime] = useState<number>(0);
   const [dailyRewardClaimed, setDailyRewardClaimed] = useState<boolean>(false);
   const [lastRewardDate, setLastRewardDate] = useState<string>("");
+  const [audienceMood, setAudienceMood] = useState<AudienceMood>("neutral");
+  // Batch 2 state
+  const [rivalCreator, setRivalCreator] = useState<AICreator | null>(null);
+  const [dramaCount, setDramaCount] = useState<number>(0);
+  const [fanRebellionActive, setFanRebellionActive] = useState<boolean>(false);
+  const [platformTakeoverActive, setPlatformTakeoverActive] =
+    useState<boolean>(false);
+  const [platformTakeoverEndsAt, setPlatformTakeoverEndsAt] = useState<
+    number | null
+  >(null);
 
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -1456,6 +1540,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     lastPostTime: number;
     dailyRewardClaimed: boolean;
     lastRewardDate: string;
+    stories: Story[];
+    rivalCreator: AICreator | null;
+    dramaCount: number;
+    fanRebellionActive: boolean;
+    platformTakeoverActive: boolean;
+    platformTakeoverEndsAt: number | null;
   } | null>(null);
 
   // V5 Pass 2: Login streak check on mount
@@ -1521,6 +1611,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           lastPostTime: s.lastPostTime,
           dailyRewardClaimed: s.dailyRewardClaimed,
           lastRewardDate: s.lastRewardDate,
+          stories: s.stories,
+          rivalCreator: s.rivalCreator,
+          dramaCount: s.dramaCount,
+          fanRebellionActive: s.fanRebellionActive,
+          platformTakeoverActive: s.platformTakeoverActive,
+          platformTakeoverEndsAt: s.platformTakeoverEndsAt,
           savedAt: Date.now(),
         });
       }
@@ -1565,6 +1661,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastPostTime,
       dailyRewardClaimed,
       lastRewardDate,
+      stories,
+      rivalCreator,
+      dramaCount,
+      fanRebellionActive,
+      platformTakeoverActive,
+      platformTakeoverEndsAt,
     };
   });
 
@@ -1599,6 +1701,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setDailyRewardClaimed(false);
     setLastRewardDate("");
     setLastSaved(null);
+    setRivalCreator(null);
+    setDramaCount(0);
+    setFanRebellionActive(false);
+    setPlatformTakeoverActive(false);
+    setPlatformTakeoverEndsAt(null);
   }, []);
 
   const navigate = useCallback((page: string, params?: Partial<Route>) => {
@@ -1766,9 +1873,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProfile((p) => ({ ...p, following: Math.max(0, p.following - 1) }));
   }, []);
 
-  const addStory = useCallback((story: Story) => {
-    setStories((prev) => [story, ...prev]);
-  }, []);
+  const addStory = useCallback(
+    (story: Story) => {
+      setStories((prev) => [story, ...prev]);
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  const reactToStory = useCallback(
+    (storyId: string, reaction: "fire" | "heart" | "laugh") => {
+      setStories((prev) =>
+        prev.map((s) => {
+          if (s.id !== storyId) return s;
+          const wasReacted = s.userReaction === reaction;
+          return {
+            ...s,
+            userReaction: wasReacted ? null : reaction,
+            reactions: {
+              ...s.reactions,
+              [reaction]: wasReacted
+                ? Math.max(0, s.reactions[reaction] - 1)
+                : s.reactions[reaction] + 1,
+            },
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const replyToStory = useCallback(
+    (storyId: string, text: string) => {
+      setStories((prev) =>
+        prev.map((s) => {
+          if (s.id !== storyId) return s;
+          const reply: StoryReply = {
+            id: `reply-${Date.now()}`,
+            username: profile.username,
+            avatar: profile.avatar,
+            text,
+            createdAt: Date.now(),
+          };
+          return { ...s, replies: [...s.replies, reply] };
+        }),
+      );
+    },
+    [profile.username, profile.avatar],
+  );
 
   const addCommentReply = useCallback(
     (postId: string, commentId: string, reply: CommentReply) => {
@@ -1838,6 +1990,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (typeof saved.lastRewardDate === "string")
       setLastRewardDate(saved.lastRewardDate);
     if (saved.savedAt) setLastSaved(saved.savedAt);
+    if (Array.isArray(saved.stories)) setStories(saved.stories as Story[]);
+    if (saved.rivalCreator) setRivalCreator(saved.rivalCreator as AICreator);
+    if (typeof saved.dramaCount === "number") setDramaCount(saved.dramaCount);
+    if (typeof saved.fanRebellionActive === "boolean")
+      setFanRebellionActive(saved.fanRebellionActive);
+    if (typeof saved.platformTakeoverActive === "boolean")
+      setPlatformTakeoverActive(saved.platformTakeoverActive);
+    if (saved.platformTakeoverEndsAt !== undefined)
+      setPlatformTakeoverEndsAt(saved.platformTakeoverEndsAt as number | null);
   }, []);
 
   const acceptCollab = useCallback(
@@ -2215,6 +2376,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(coldTimer);
   }, [burnoutActive, coldAudienceActive, addNotification]);
 
+  // Audience mood calculation
+  useEffect(() => {
+    const now = Date.now();
+    const hoursSincePost =
+      lastPostTime > 0 ? (now - lastPostTime) / 3600000 : 999;
+    if (burnoutActive || hoursSincePost >= 48) {
+      setAudienceMood("angry");
+    } else if (hoursSincePost >= 24) {
+      setAudienceMood("bored");
+    } else if (postingStreak > 3) {
+      setAudienceMood("hyped");
+    } else {
+      setAudienceMood("neutral");
+    }
+  }, [burnoutActive, lastPostTime, postingStreak]);
+
+  // Platform takeover auto-end
+  useEffect(() => {
+    if (!platformTakeoverActive || !platformTakeoverEndsAt) return;
+    const remaining = platformTakeoverEndsAt - Date.now();
+    if (remaining <= 0) {
+      setPlatformTakeoverActive(false);
+      setPlatformTakeoverEndsAt(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setPlatformTakeoverActive(false);
+      setPlatformTakeoverEndsAt(null);
+    }, remaining);
+    return () => clearTimeout(t);
+  }, [platformTakeoverActive, platformTakeoverEndsAt]);
+
+  // Fan rebellion auto-stop when player posts (lastPostTime changes)
+  useEffect(() => {
+    if (!fanRebellionActive) return;
+    const now = Date.now();
+    const msSincePost =
+      lastPostTime > 0 ? now - lastPostTime : Number.POSITIVE_INFINITY;
+    if (msSincePost < 20 * 60 * 1000) {
+      setFanRebellionActive(false);
+    }
+  }, [lastPostTime, fanRebellionActive]);
+
   // Smart notification scheduler
   const smartNotifFiredRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -2274,9 +2478,79 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => timers.forEach(clearTimeout);
   }, [addNotification]);
 
-  const TWENTY_FOUR_MIN = 24 * 60 * 1000;
+  // Progressive story view simulation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const hour = new Date(now).getHours();
+      const timeMult =
+        hour >= 18 && hour <= 22 ? 1.3 : hour >= 12 && hour <= 17 ? 1.1 : 0.8;
+      setStories((prev) =>
+        prev.map((s) => {
+          const isOwn = s.userId === "me";
+          if (isOwn) {
+            const ageMin = (now - s.createdAt) / 60000;
+            let baseGrowthRate: number;
+            if (ageMin < 5) baseGrowthRate = 0.01 + Math.random() * 0.02;
+            else if (ageMin < 30) baseGrowthRate = 0.005 + Math.random() * 0.01;
+            else if (ageMin < 120)
+              baseGrowthRate = 0.003 + Math.random() * 0.005;
+            else baseGrowthRate = 0.0005 + Math.random() * 0.001;
+            const variation = 0.8 + Math.random() * 0.4;
+            const addViews = Math.floor(
+              profile.followers * baseGrowthRate * variation * timeMult,
+            );
+            const newViewCount = Math.min(
+              s.viewCount + addViews,
+              Math.floor(profile.followers * 0.85),
+            );
+            const newViewRate = Math.min(
+              (newViewCount / Math.max(profile.followers, 1)) * 100,
+              80,
+            );
+            return {
+              ...s,
+              viewCount: newViewCount,
+              viewRate: newViewRate,
+              peakReached: s.peakReached || newViewRate > 30,
+            };
+          }
+          const addViews = Math.floor(50 + Math.random() * 450);
+          const cap = 50000;
+          return { ...s, viewCount: Math.min(s.viewCount + addViews, cap) };
+        }),
+      );
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [profile.followers]);
+
+  // Update performanceDelta for user stories every 60s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStories((prev) => {
+        const userStories = prev.filter((s) => s.userId === "me");
+        if (userStories.length === 0) return prev;
+        const avgViewRate =
+          userStories.reduce((acc, s) => acc + s.viewRate, 0) /
+          userStories.length;
+        return prev.map((s) => {
+          if (s.userId !== "me") return s;
+          return {
+            ...s,
+            performanceDelta:
+              avgViewRate > 0
+                ? ((s.viewRate - avgViewRate) / avgViewRate) * 100
+                : 0,
+          };
+        });
+      });
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
   const activeStories = stories.filter(
-    (s) => Date.now() - s.createdAt < TWENTY_FOUR_MIN,
+    (s) => (s.expiresAt ?? s.createdAt + TWENTY_FOUR_HOURS) > Date.now(),
   );
 
   return (
@@ -2319,6 +2593,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         followUser,
         unfollowUser,
         addStory,
+        reactToStory,
+        replyToStory,
         addCommentReply,
         addSimulatedPost,
         currentRoute,
@@ -2376,6 +2652,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDailyRewardClaimed,
         lastRewardDate,
         setLastRewardDate,
+        audienceMood,
+        setAudienceMood,
+        // Batch 2
+        rivalCreator,
+        setRivalCreator,
+        dramaCount,
+        setDramaCount,
+        fanRebellionActive,
+        setFanRebellionActive,
+        platformTakeoverActive,
+        setPlatformTakeoverActive,
+        platformTakeoverEndsAt,
+        setPlatformTakeoverEndsAt,
       }}
     >
       {children}

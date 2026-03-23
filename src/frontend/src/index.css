@@ -196,3 +196,27 @@
   background: oklch(0.55 0.15 295);
   animation: typing-bounce 1.2s ease-in-out infinite;
 }
+
+/* Fan Rebellion pulse */
+@keyframes rebellion-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px oklch(0.55 0.28 25 / 0.3);
+    border-color: oklch(0.65 0.28 25 / 0.5);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.55 0.28 25 / 0.6);
+    border-color: oklch(0.75 0.3 25 / 0.8);
+  }
+}
+
+/* Shake animation for rebellion emoji */
+@keyframes shake {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
