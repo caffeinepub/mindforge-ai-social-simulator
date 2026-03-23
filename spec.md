@@ -1,29 +1,34 @@
-# MindForge AI Social Simulator — Batch 2
+# MindForge AI Social Simulator — Version 16
 
 ## Current State
-MindForge V5.1 is live with 80+ features including Live Streaming (Batch 1). The app has persistent LocalStorage save, PWA offline, 5-icon bottom nav, Creator Hub, Creator Coins, skill upgrades, AI creators, viral engine, analytics, messaging, and story system.
+MindForge V15 is a fully persistent, offline-capable social media creator simulator with 80+ features across V1–V15. The service worker uses a hardcoded cache name `mindforge-v5`, which means users with any cached version never receive updates on refresh — the old cached app is always served instead of the new one.
 
 ## Requested Changes (Diff)
 
 ### Add
-- **Creator Drama Engine**: AI creators can call out the player, start beef, or copy their content. Player gets a notification with 3 choices (respond, ignore, escalate). Each choice affects reputation/trust score and follower count differently.
-- **Creator Rivalries**: One AI creator becomes the player's rival — tracks the player's stats, posts competitive content, and tries to outperform them. Rival is shown on Profile page with a head-to-head stats comparison.
-- **Fan Rebellion**: If the player hasn't posted in a long time or engagement drops severely, fans start unfollowing in waves with angry comments appearing in the feed. A "Calm Your Fans" action lets the player recover.
-- **Platform Takeover Events**: Rare random events where the algorithm goes haywire — any post can massively blow up or tank. Shown as a dramatic platform-wide banner with a countdown. During the event, viral scoring is randomized with extreme multipliers.
+- **Version 16 update prompt**: When the app loads and detects a new service worker is waiting, show a non-intrusive "Update available — tap to refresh" banner that triggers `skipWaiting` and reloads to V16.
+- **Batch 4 Feature: Celebrity Mode** — Unlocks at 1M followers. Shows a special "Celebrity" badge on profile, unlocks paparazzi events (random pop-up events with follower spikes), a brand empire panel, and a global fanbase system.
+- **Batch 4 Feature: Legacy Score** — A permanent all-time score that tracks total engagement, followers peaked, viral posts, and brand deal earnings. Persists even through New Game resets (stored separately in localStorage).
+- **Batch 4 Feature: Hall of Fame** — A dedicated page (in Creator Hub) listing top creators of all time across all playthroughs, pulled from the Legacy Score data. Never resets.
+- **Batch 4 Feature: Black Market** — A risky underground shop (in Creator Hub) offering: stolen engagement data (temporary engagement boost), leaked algorithm info (brief viral multiplier), rival sabotage (temporarily reduces an AI rival's reach). Each action has coin cost and risk of backfire.
+- **Batch 4 Feature: Fan Army Wars** — Your fans vs a rival AI creator's fans in an engagement challenge. User picks a rival, both sides accumulate engagement points over a timed period, winner gets a follower boost and coin reward.
+- **Batch 4 Feature: Real-Time Trend Battles** — Two hashtags compete; user picks a side when creating a post. Results update every few seconds showing which side is winning. Winner gets a 2x reach multiplier for posts using that hashtag.
 
 ### Modify
-- `AppContext.tsx`: Add drama events state, rival creator state, fan rebellion state, and platform takeover event state. Integrate into persistence (LocalStorage).
-- `HomeFeed.tsx`: Show drama notifications, fan rebellion alerts, platform takeover banner.
-- `Profile.tsx`: Show rival creator comparison panel.
-- Notification system: Add drama/rivalry/rebellion/takeover notification types.
+- **Service worker (`sw.js`)**: Update cache name from `mindforge-v5` to `mindforge-v16`. This forces all users with cached old versions to receive the new version on next refresh/visit.
+- **main.tsx or App.tsx**: Register a `controllerchange` listener so when the service worker updates, the page reloads automatically (seamless forced update).
 
 ### Remove
 - Nothing removed.
 
 ## Implementation Plan
-1. Add drama/rival/rebellion/takeover state to AppContext with LocalStorage persistence.
-2. Drama Engine: Random timer triggers AI creator drama event → notification with 3 choices → outcome affects trust score + followers.
-3. Rivalry System: Assign one rival AI creator on first trigger, show on Profile as head-to-head stats card, rival posts more aggressively.
-4. Fan Rebellion: Monitor post frequency; if player hasn't posted in 30+ min (simulated inactivity), trigger rebellion wave — follower drop + angry comments. "Post Now" or "Calm Fans" button to stop it.
-5. Platform Takeover: Rare random event (every 20-40 min), dramatic banner with countdown in feed, viral multipliers go wild (0.1x to 50x) for 2 minutes.
-6. All events wired to notification system.
+1. Update `sw.js` cache name to `mindforge-v16` and add `skipWaiting()` + `clients.claim()` to force immediate activation.
+2. In `main.tsx`, after service worker registration, listen for `controllerchange` event and call `window.location.reload()` to auto-update all open tabs.
+3. Add an update notification banner in `App.tsx` that fires when a new SW is waiting.
+4. Create `src/frontend/src/pages/HallOfFame.tsx` — Legacy Score display + all-time top creators table.
+5. Create `src/frontend/src/pages/BlackMarket.tsx` — Underground shop with 3 purchasable risk actions.
+6. Create `src/frontend/src/pages/FanArmyWars.tsx` — Pick rival, timed engagement battle, results + rewards.
+7. Create `src/frontend/src/pages/TrendBattles.tsx` — Two competing hashtags, pick a side on post creation, live leaderboard.
+8. Update `AppContext.tsx` — Add `legacyScore` state (persisted separately, never reset), `celebrityMode` flag (unlocked at 1M followers), `blackMarketHistory`, `fanArmyWar` state, `trendBattle` state.
+9. Update `CreatorHub.tsx` — Add links to Hall of Fame, Black Market, Fan Army Wars, Trend Battles.
+10. Update `Profile.tsx` — Show Celebrity badge + paparazzi event modal when celebrity mode is active.

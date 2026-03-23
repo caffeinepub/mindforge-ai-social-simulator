@@ -320,6 +320,42 @@ export interface InvestmentItem {
 
 export type AudienceMood = "hyped" | "neutral" | "bored" | "angry";
 
+export interface AiManagerMessage {
+  id: string;
+  text: string;
+  type: "tip" | "warning" | "celebration" | "info";
+  timestamp: number;
+  read: boolean;
+}
+
+export interface LegacyScore {
+  totalEngagement: number;
+  peakFollowers: number;
+  viralPosts: number;
+  brandEarnings: number;
+  gamesPlayed: number;
+}
+
+const LEGACY_KEY = "mindforge-legacy";
+
+function loadLegacyScore(): LegacyScore {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (raw) return JSON.parse(raw) as LegacyScore;
+  } catch (_) {}
+  return {
+    totalEngagement: 0,
+    peakFollowers: 0,
+    viralPosts: 0,
+    brandEarnings: 0,
+    gamesPlayed: 0,
+  };
+}
+
+function saveLegacyScore(score: LegacyScore) {
+  localStorage.setItem(LEGACY_KEY, JSON.stringify(score));
+}
+
 interface AppContextType {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
@@ -427,6 +463,12 @@ interface AppContextType {
   setLastRewardDate: React.Dispatch<React.SetStateAction<string>>;
   audienceMood: AudienceMood;
   setAudienceMood: React.Dispatch<React.SetStateAction<AudienceMood>>;
+  audienceMoodScore: number;
+  setAudienceMoodScore: React.Dispatch<React.SetStateAction<number>>;
+  aiManagerMessages: AiManagerMessage[];
+  setAiManagerMessages: React.Dispatch<
+    React.SetStateAction<AiManagerMessage[]>
+  >;
   // Batch 2
   rivalCreator: AICreator | null;
   setRivalCreator: React.Dispatch<React.SetStateAction<AICreator | null>>;
@@ -440,6 +482,11 @@ interface AppContextType {
   setPlatformTakeoverEndsAt: React.Dispatch<
     React.SetStateAction<number | null>
   >;
+  // Batch 4
+  legacyScore: LegacyScore;
+  setLegacyScore: React.Dispatch<React.SetStateAction<LegacyScore>>;
+  updateLegacyScore: (updates: Partial<LegacyScore>) => void;
+  celebrityMode: boolean;
 }
 
 export const SAMPLE_COMMENTS = [
@@ -1400,6 +1447,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [dailyRewardClaimed, setDailyRewardClaimed] = useState<boolean>(false);
   const [lastRewardDate, setLastRewardDate] = useState<string>("");
   const [audienceMood, setAudienceMood] = useState<AudienceMood>("neutral");
+  const [audienceMoodScore, setAudienceMoodScore] = useState<number>(50);
+  const [aiManagerMessages, setAiManagerMessages] = useState<
+    AiManagerMessage[]
+  >([]);
+  // Batch 4 state
+  const [legacyScore, setLegacyScore] = useState<LegacyScore>(() =>
+    loadLegacyScore(),
+  );
+  const celebrityMode = (profile?.followers ?? 0) >= 1_000_000;
+
   // Batch 2 state
   const [rivalCreator, setRivalCreator] = useState<AICreator | null>(null);
   const [dramaCount, setDramaCount] = useState<number>(0);
@@ -1546,6 +1603,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fanRebellionActive: boolean;
     platformTakeoverActive: boolean;
     platformTakeoverEndsAt: number | null;
+    audienceMoodScore: number;
+    aiManagerMessages: AiManagerMessage[];
   } | null>(null);
 
   // V5 Pass 2: Login streak check on mount
@@ -1617,6 +1676,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           fanRebellionActive: s.fanRebellionActive,
           platformTakeoverActive: s.platformTakeoverActive,
           platformTakeoverEndsAt: s.platformTakeoverEndsAt,
+          audienceMoodScore: s.audienceMoodScore,
+          aiManagerMessages: s.aiManagerMessages,
           savedAt: Date.now(),
         });
       }
@@ -1667,6 +1728,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fanRebellionActive,
       platformTakeoverActive,
       platformTakeoverEndsAt,
+      audienceMoodScore,
+      aiManagerMessages,
     };
   });
 
@@ -1679,6 +1742,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const newGame = useCallback(() => {
     clearGameState();
+    setLegacyScore((prev) => {
+      const next = { ...prev, gamesPlayed: prev.gamesPlayed + 1 };
+      saveLegacyScore(next);
+      return next;
+    });
     setIsNewUser(true);
     setCreatorCoins(100);
     setSkills({
@@ -1706,6 +1774,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setFanRebellionActive(false);
     setPlatformTakeoverActive(false);
     setPlatformTakeoverEndsAt(null);
+    setAudienceMoodScore(50);
+    setAiManagerMessages([]);
+  }, []);
+
+  const updateLegacyScore = useCallback((updates: Partial<LegacyScore>) => {
+    setLegacyScore((prev) => {
+      const next = { ...prev, ...updates };
+      saveLegacyScore(next);
+      return next;
+    });
   }, []);
 
   const navigate = useCallback((page: string, params?: Partial<Route>) => {
@@ -1999,6 +2077,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPlatformTakeoverActive(saved.platformTakeoverActive);
     if (saved.platformTakeoverEndsAt !== undefined)
       setPlatformTakeoverEndsAt(saved.platformTakeoverEndsAt as number | null);
+    if (typeof saved.audienceMoodScore === "number")
+      setAudienceMoodScore(saved.audienceMoodScore);
+    if (Array.isArray(saved.aiManagerMessages))
+      setAiManagerMessages(saved.aiManagerMessages as AiManagerMessage[]);
   }, []);
 
   const acceptCollab = useCallback(
@@ -2392,6 +2474,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [burnoutActive, lastPostTime, postingStreak]);
 
+  // Audience mood score update logic
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const hoursSincePost =
+        lastPostTime > 0 ? (now - lastPostTime) / 3600000 : 999;
+      setAudienceMoodScore((prev) => {
+        let score = prev;
+        if (hoursSincePost >= 4) score = Math.max(0, score - 5);
+        if (burnoutActive) score = Math.max(0, score - 8);
+        score = Math.max(0, Math.min(100, score));
+        return score;
+      });
+    }, 60000); // check every minute
+    return () => clearInterval(interval);
+  }, [lastPostTime, burnoutActive]);
+
+  // Update mood tier from score
+  useEffect(() => {
+    if (audienceMoodScore >= 75) setAudienceMood("hyped");
+    else if (audienceMoodScore >= 40) setAudienceMood("neutral");
+    else if (audienceMoodScore >= 20) setAudienceMood("bored");
+    else setAudienceMood("angry");
+  }, [audienceMoodScore]);
+
   // Platform takeover auto-end
   useEffect(() => {
     if (!platformTakeoverActive || !platformTakeoverEndsAt) return;
@@ -2654,6 +2761,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLastRewardDate,
         audienceMood,
         setAudienceMood,
+        audienceMoodScore,
+        setAudienceMoodScore,
+        aiManagerMessages,
+        setAiManagerMessages,
+        // Batch 4
+        legacyScore,
+        setLegacyScore,
+        updateLegacyScore,
+        celebrityMode,
         // Batch 2
         rivalCreator,
         setRivalCreator,

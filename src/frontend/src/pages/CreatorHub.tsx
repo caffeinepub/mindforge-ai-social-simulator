@@ -104,6 +104,34 @@ const HUB_FEATURES = [
     description: "Spin to go viral or flop",
     page: "viral-roulette",
   },
+  {
+    id: "hall-of-fame",
+    emoji: "🏆",
+    label: "Hall of Fame",
+    description: "Your all-time legacy & records",
+    page: "hall-of-fame",
+  },
+  {
+    id: "black-market",
+    emoji: "⚫",
+    label: "Black Market",
+    description: "⚠️ Risky underground deals",
+    page: "black-market",
+  },
+  {
+    id: "fan-army-wars",
+    emoji: "⚔️",
+    label: "Fan Army Wars",
+    description: "Battle rival fan armies",
+    page: "fan-army-wars",
+  },
+  {
+    id: "trend-battles",
+    emoji: "📊",
+    label: "Trend Battles",
+    description: "Hashtag wars & viral showdowns",
+    page: "trend-battles",
+  },
 ];
 
 const GRADIENT_MAP: Record<string, string> = {
@@ -126,6 +154,14 @@ const GRADIENT_MAP: Record<string, string> = {
   streaks: "linear-gradient(135deg, oklch(0.68 0.22 50), oklch(0.62 0.2 30))",
   roulette:
     "linear-gradient(135deg, oklch(0.55 0.25 295), oklch(0.6 0.22 320))",
+  "hall-of-fame":
+    "linear-gradient(135deg, oklch(0.7 0.18 80), oklch(0.65 0.2 60))",
+  "black-market":
+    "linear-gradient(135deg, oklch(0.3 0.05 280), oklch(0.25 0.04 260))",
+  "fan-army-wars":
+    "linear-gradient(135deg, oklch(0.6 0.22 25), oklch(0.55 0.2 350))",
+  "trend-battles":
+    "linear-gradient(135deg, oklch(0.55 0.22 260), oklch(0.6 0.2 295))",
 };
 
 export default function CreatorHub() {
@@ -301,6 +337,83 @@ export default function CreatorHub() {
               <RefreshCw className="w-3.5 h-3.5" />
               New Game
             </Button>
+          </div>
+        </div>
+
+        {/* Coming Soon */}
+        <div
+          className="rounded-2xl p-4 space-y-3"
+          style={{
+            background: "oklch(0.12 0.02 280)",
+            border: "1px solid oklch(0.22 0.025 280 / 0.5)",
+          }}
+          data-ocid="hub.coming_soon.panel"
+        >
+          <h3
+            className="text-xs font-semibold uppercase tracking-widest"
+            style={{ color: "oklch(0.55 0.08 260)" }}
+          >
+            ⏳ Coming Soon
+          </h3>
+          <div className="space-y-2">
+            {[
+              {
+                emoji: "🌟",
+                label: "Celebrity Mode",
+                desc: "Unlock at 1M followers",
+              },
+              {
+                emoji: "🏆",
+                label: "Legacy Score",
+                desc: "All-time impact tracker",
+              },
+              {
+                emoji: "🎖️",
+                label: "Hall of Fame",
+                desc: "Top creators across all time",
+              },
+              {
+                emoji: "🕶️",
+                label: "Black Market",
+                desc: "Risky underground deals",
+              },
+              {
+                emoji: "⚔️",
+                label: "Fan Army Wars",
+                desc: "Your fans vs rivals",
+              },
+              {
+                emoji: "📡",
+                label: "Real-Time Trend Battles",
+                desc: "Hashtag wars & viral showdowns",
+              },
+            ].map((f) => (
+              <div key={f.label} className="flex items-center gap-3 py-1.5">
+                <span className="text-lg w-7 text-center flex-shrink-0">
+                  {f.emoji}
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {f.label}
+                  </p>
+                  <p
+                    className="text-xs"
+                    style={{ color: "oklch(0.38 0.03 280)" }}
+                  >
+                    {f.desc}
+                  </p>
+                </div>
+                <span
+                  className="ml-auto text-xs px-2 py-0.5 rounded-full"
+                  style={{
+                    background: "oklch(0.18 0.025 280)",
+                    color: "oklch(0.45 0.04 280)",
+                  }}
+                >
+                  Soon
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 

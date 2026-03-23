@@ -63,6 +63,7 @@ export default function Monetization() {
     negotiateSponsorship,
     navigate,
     profile,
+    celebrityMode,
   } = useApp();
   const niche = profile.niche || "Tech";
   const cpm = CPM_BY_NICHE[niche] ?? 3.5;
@@ -603,6 +604,86 @@ export default function Monetization() {
           ))}
         </div>
       </motion.div>
+
+      {/* Brand Empire - Celebrity Mode Only */}
+      {celebrityMode && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.18 0.04 80 / 0.3), oklch(0.15 0.03 60 / 0.2))",
+            border: "1px solid oklch(0.7 0.18 80 / 0.4)",
+            borderRadius: "1rem",
+            padding: "1.25rem",
+          }}
+          data-ocid="monetization.brand_empire.card"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">⭐</span>
+            <div>
+              <h3 className="font-bold text-foreground">Brand Empire</h3>
+              <p className="text-xs text-muted-foreground">
+                Celebrity-tier mega deals
+              </p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {[
+              {
+                name: "Global Tech Partnership",
+                brand: "TechCorp Elite",
+                value: 75000,
+                emoji: "💻",
+              },
+              {
+                name: "Luxury Fashion Collab",
+                brand: "PrestigeWear",
+                value: 50000,
+                emoji: "👗",
+              },
+              {
+                name: "Celebrity Endorsement",
+                brand: "MegaBrand Global",
+                value: 100000,
+                emoji: "🌟",
+              },
+            ].map((deal, idx) => (
+              <div
+                key={deal.name}
+                className="flex items-center justify-between p-3 rounded-xl"
+                style={{
+                  background: "oklch(0.13 0.016 280 / 0.8)",
+                  border: "1px solid oklch(0.7 0.18 80 / 0.2)",
+                }}
+                data-ocid={`monetization.brand_empire.item.${idx + 1}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{deal.emoji}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {deal.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {deal.brand}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p
+                    className="text-sm font-black"
+                    style={{ color: "oklch(0.78 0.18 80)" }}
+                  >
+                    ${deal.value.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">per deal</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

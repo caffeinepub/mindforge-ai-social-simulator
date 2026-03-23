@@ -56,6 +56,8 @@ export interface SavedGameState {
   fanRebellionActive?: boolean;
   platformTakeoverActive?: boolean;
   platformTakeoverEndsAt?: number | null;
+  audienceMoodScore?: number;
+  aiManagerMessages?: unknown[];
   savedAt: number;
 }
 

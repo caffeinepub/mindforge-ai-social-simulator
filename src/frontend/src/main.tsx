@@ -16,6 +16,17 @@ declare global {
 
 const queryClient = new QueryClient();
 
+// Register service worker and auto-reload when new SW takes control
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker
+    .register("/sw.js")
+    .catch((err) => console.warn("SW registration failed:", err));
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    window.location.reload();
+  });
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={queryClient}>
     <InternetIdentityProvider>

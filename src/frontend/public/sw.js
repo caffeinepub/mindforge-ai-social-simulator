@@ -1,5 +1,5 @@
-// MindForge V5 Service Worker
-const CACHE_NAME = "mindforge-v5";
+// MindForge V16 Service Worker
+const CACHE_NAME = "mindforge-v16";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

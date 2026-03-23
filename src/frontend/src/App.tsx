@@ -13,9 +13,12 @@ import { type DramaEvent, useDramaEngine } from "./hooks/useDramaEngine";
 import { useEngagementSimulator } from "./hooks/useEngagementSimulator";
 import { useViralEngine } from "./hooks/useViralEngine";
 import Analytics from "./pages/Analytics";
+import BlackMarket from "./pages/BlackMarket";
 import CreatorHouses from "./pages/CreatorHouses";
 import CreatorHub from "./pages/CreatorHub";
 import Explore from "./pages/Explore";
+import FanArmyWars from "./pages/FanArmyWars";
+import HallOfFame from "./pages/HallOfFame";
 import HashtagPage from "./pages/HashtagPage";
 import HomeFeed from "./pages/HomeFeed";
 import Leaderboard from "./pages/Leaderboard";
@@ -25,6 +28,7 @@ import Messages from "./pages/Messages";
 import Monetization from "./pages/Monetization";
 import Onboarding from "./pages/Onboarding";
 import Profile from "./pages/Profile";
+import TrendBattles from "./pages/TrendBattles";
 import Trending from "./pages/Trending";
 import ViralRoulette from "./pages/ViralRoulette";
 
@@ -70,9 +74,9 @@ function AppShell() {
       case "hub":
         return <CreatorHub />;
       case "creator-studio":
-        return <HomeFeed />; // placeholder until CreatorStudio page exists
+        return <HomeFeed />;
       case "challenges":
-        return <HomeFeed />; // placeholder
+        return <HomeFeed />;
       case "user-profile":
         return <Profile userId={currentRoute.userId} />;
       case "hashtag":
@@ -81,6 +85,14 @@ function AppShell() {
         return <LiveStream />;
       case "viral-roulette":
         return <ViralRoulette />;
+      case "hall-of-fame":
+        return <HallOfFame />;
+      case "black-market":
+        return <BlackMarket />;
+      case "fan-army-wars":
+        return <FanArmyWars />;
+      case "trend-battles":
+        return <TrendBattles />;
       default:
         return <HomeFeed />;
     }
@@ -120,6 +132,17 @@ function AppShell() {
           },
         }}
       />
+      {/* V16 version badge */}
+      <div
+        className="fixed bottom-2 right-2 z-50 text-xs font-bold px-2 py-0.5 rounded-full pointer-events-none select-none"
+        style={{
+          background: "oklch(0.55 0.22 295 / 0.18)",
+          border: "1px solid oklch(0.55 0.22 295 / 0.4)",
+          color: "oklch(0.72 0.2 295)",
+        }}
+      >
+        V16
+      </div>
     </div>
   );
 }

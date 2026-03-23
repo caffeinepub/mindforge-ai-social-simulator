@@ -176,9 +176,16 @@ export default function HomeFeed() {
     lastPostTime,
     navigate,
     audienceMood,
+    audienceMoodScore,
+    setAudienceMoodScore,
+    aiManagerMessages,
+    setAiManagerMessages,
     fanRebellionActive,
     platformTakeoverActive,
     platformTakeoverEndsAt,
+    reputationScore,
+    burnoutActive,
+    postingStreak,
   } = useApp();
   const [caption, setCaption] = useState("");
   const [seriesInput, setSeriesInput] = useState("");
@@ -191,6 +198,7 @@ export default function HomeFeed() {
   } | null>(null);
   const [eventDismissed, setEventDismissed] = useState(false);
   const [takeoverCountdown, setTakeoverCountdown] = useState<string>("2:00");
+  const [maxPanelOpen, setMaxPanelOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const simFeedPageRef = useRef(0);
@@ -314,6 +322,8 @@ export default function HomeFeed() {
       setPostingStreak(1);
     }
     setLastPostTime(now);
+    // Update mood score on post
+    setAudienceMoodScore((prev) => Math.min(100, prev + 5));
     toast.success("Post published! 🎉");
     setCaption("");
     setSeriesInput("");
@@ -326,6 +336,97 @@ export default function HomeFeed() {
     );
     toast.success(`${tag} added to your post!`);
   };
+
+  // AI Manager message generation
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs once on mount for interval setup
+  useEffect(() => {
+    const generateMessage = () => {
+      const now = Date.now();
+      const hour = new Date().getHours();
+      const today = posts.filter(
+        (p) =>
+          p.authorUsername === profile.username && now - p.timestamp < 86400000,
+      );
+      const recentViral = posts.find(
+        (p) =>
+          p.authorUsername === profile.username &&
+          p.engagementScore > 5000 &&
+          now - p.timestamp < 3600000,
+      );
+      const hoursSincePost =
+        lastPostTime > 0 ? (now - lastPostTime) / 3600000 : 99;
+
+      let text = "";
+      let type: "tip" | "warning" | "celebration" | "info" = "tip";
+
+      if (recentViral) {
+        text =
+          "🔥 That post is blowing up! Strike while it's hot — post a follow-up to ride the wave.";
+        type = "celebration";
+      } else if (burnoutActive) {
+        text =
+          "⚠️ You're posting too much. Quality over quantity — take a breath and let your audience recover.";
+        type = "warning";
+      } else if (today.length >= 5) {
+        text =
+          "⚠️ You've posted 5+ times today. Overposting can hurt engagement. Slow down a bit!";
+        type = "warning";
+      } else if (profile.followers < 1000) {
+        text =
+          "Your audience is small but mighty. Consistent posting is your fastest path to 1K followers!";
+        type = "tip";
+      } else if (reputationScore > 80) {
+        text =
+          "Your reputation is strong 💪 Now's the perfect time to negotiate better brand deals.";
+        type = "info";
+      } else if (audienceMoodScore < 30) {
+        text =
+          "Engagement is slipping 😬 Try a different content type or refresh your hashtag strategy.";
+        type = "warning";
+      } else if (hoursSincePost >= 2) {
+        text =
+          "Your audience misses you 👀 A quick post could reignite your momentum right now.";
+        type = "tip";
+      } else if (hour >= 6 && hour <= 10) {
+        text =
+          "Good morning! ☀️ Peak engagement hours are starting. Post now for maximum reach!";
+        type = "info";
+      } else if (postingStreak >= 5) {
+        text = `🔥 ${postingStreak}-day streak! Your consistency is building serious momentum. Keep it up!`;
+        type = "celebration";
+      } else {
+        const tips = [
+          "Mix up your content formats — carousels get 3x more saves than single images.",
+          "Reply to comments within the first hour. It signals quality to the algorithm.",
+          "Use 3-5 niche hashtags instead of generic ones for better reach.",
+          "Your best posts tend to come when you post between 6-9pm local time.",
+          "Collaborating with another creator can 2x your follower growth this week.",
+        ];
+        text = tips[Math.floor(Math.random() * tips.length)];
+        type = "tip";
+      }
+
+      if (!text) return;
+      const newMsg = {
+        id: `max-${now}`,
+        text,
+        type,
+        timestamp: now,
+        read: false,
+      };
+      setAiManagerMessages((prev) => [newMsg, ...prev].slice(0, 20));
+    };
+
+    // Generate immediately on mount if no messages
+    if (aiManagerMessages.length === 0) generateMessage();
+
+    const interval = setInterval(
+      generateMessage,
+      5 * 60 * 1000 + Math.random() * 5 * 60 * 1000,
+    );
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const allFeedPosts = [...posts].sort((a, b) => {
     const isOwn = (p: PostItem) => p.authorUsername === profile.username;
@@ -462,59 +563,99 @@ export default function HomeFeed() {
         />
       )}
 
-      {/* Audience Mood Banner */}
-      {audienceMood === "hyped" && (
-        <div
-          data-ocid="feed.mood.panel"
-          className="rounded-2xl px-4 py-3 text-sm font-medium flex items-center gap-2"
-          style={{
-            background: "oklch(0.22 0.06 80 / 0.3)",
-            border: "1px solid oklch(0.65 0.2 80 / 0.3)",
-            color: "oklch(0.82 0.18 80)",
-          }}
-        >
-          😤 Your audience is <strong>HYPED!</strong> 🔥 Post now for max reach
-        </div>
-      )}
-      {audienceMood === "neutral" && (
-        <div
-          data-ocid="feed.mood.panel"
-          className="rounded-2xl px-4 py-3 text-sm flex items-center gap-2"
-          style={{
-            background: "oklch(0.16 0.02 280 / 0.5)",
-            border: "1px solid oklch(0.28 0.03 280 / 0.4)",
-            color: "oklch(0.6 0.04 280)",
-          }}
-        >
-          😐 Audience mood: Neutral
-        </div>
-      )}
-      {audienceMood === "bored" && (
-        <div
-          data-ocid="feed.mood.panel"
-          className="rounded-2xl px-4 py-3 text-sm font-medium flex items-center gap-2"
-          style={{
-            background: "oklch(0.2 0.05 230 / 0.3)",
-            border: "1px solid oklch(0.55 0.18 230 / 0.4)",
-            color: "oklch(0.72 0.18 230)",
-          }}
-        >
-          😴 ⚠️ Your audience is getting bored. Time to post!
-        </div>
-      )}
-      {audienceMood === "angry" && (
-        <div
-          data-ocid="feed.mood.panel"
-          className="rounded-2xl px-4 py-3 text-sm font-semibold flex items-center gap-2"
-          style={{
-            background: "oklch(0.2 0.06 25 / 0.3)",
-            border: "1px solid oklch(0.55 0.25 25 / 0.4)",
+      {/* Audience Mood Widget */}
+      {(() => {
+        const moodConfig = {
+          hyped: {
+            emoji: "🔥",
+            label: "HYPED",
+            color: "oklch(0.82 0.2 80)",
+            bg: "oklch(0.22 0.06 80 / 0.3)",
+            border: "oklch(0.65 0.2 80 / 0.4)",
+            bar: "oklch(0.72 0.2 80)",
+            text: "Your audience is pumped! Post now for maximum reach.",
+          },
+          neutral: {
+            emoji: "😊",
+            label: "Neutral",
+            color: "oklch(0.7 0.08 240)",
+            bg: "oklch(0.16 0.02 280 / 0.5)",
+            border: "oklch(0.28 0.03 280 / 0.4)",
+            bar: "oklch(0.55 0.12 240)",
+            text: "Audience mood is steady. Keep up your posting rhythm.",
+          },
+          bored: {
+            emoji: "😴",
+            label: "Bored",
+            color: "oklch(0.78 0.14 80)",
+            bg: "oklch(0.2 0.05 80 / 0.25)",
+            border: "oklch(0.55 0.16 80 / 0.4)",
+            bar: "oklch(0.72 0.16 80)",
+            text: "Your audience is getting bored. Time to post something fresh!",
+          },
+          angry: {
+            emoji: "😡",
+            label: "Angry",
             color: "oklch(0.72 0.22 25)",
-          }}
-        >
-          😡 🚨 Audience is angry! You haven't posted in too long.
-        </div>
-      )}
+            bg: "oklch(0.2 0.06 25 / 0.3)",
+            border: "oklch(0.55 0.25 25 / 0.4)",
+            bar: "oklch(0.65 0.25 25)",
+            text: "Audience is upset! Post immediately to recover.",
+          },
+        };
+        const cfg = moodConfig[audienceMood];
+        const mult =
+          audienceMood === "hyped"
+            ? 1.4
+            : audienceMood === "bored"
+              ? 0.7
+              : audienceMood === "angry"
+                ? 0.5
+                : 1.0;
+        return (
+          <div
+            data-ocid="feed.mood.panel"
+            className="rounded-2xl px-4 py-3 space-y-2"
+            style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{cfg.emoji}</span>
+                <span
+                  className="text-sm font-semibold"
+                  style={{ color: cfg.color }}
+                >
+                  {cfg.label}
+                </span>
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded-full font-mono"
+                  style={{
+                    background: "oklch(0.18 0.03 280 / 0.6)",
+                    color: "oklch(0.6 0.05 280)",
+                  }}
+                >
+                  {mult}x
+                </span>
+              </div>
+              <span className="text-xs font-mono" style={{ color: cfg.color }}>
+                {audienceMoodScore}/100
+              </span>
+            </div>
+            <div
+              className="h-1.5 rounded-full overflow-hidden"
+              style={{ background: "oklch(0.18 0.02 280 / 0.5)" }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${audienceMoodScore}%`, background: cfg.bar }}
+              />
+            </div>
+            <p className="text-xs" style={{ color: "oklch(0.58 0.04 280)" }}>
+              {cfg.text}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Go Live button */}
       <button
@@ -686,6 +827,163 @@ export default function HomeFeed() {
           onClose={() => setDetailPost(null)}
           onNavigate={setDetailPost}
         />
+      )}
+
+      {/* Max AI Manager floating button */}
+      {(() => {
+        const unread = aiManagerMessages.filter((m) => !m.read).length;
+        return (
+          <button
+            type="button"
+            data-ocid="feed.max_manager.button"
+            onClick={() => {
+              setMaxPanelOpen((o) => !o);
+              if (!maxPanelOpen) {
+                setAiManagerMessages((prev) =>
+                  prev.map((m) => ({ ...m, read: true })),
+                );
+              }
+            }}
+            className="fixed z-40 transition-all hover:scale-110 active:scale-95"
+            style={{
+              bottom: "88px",
+              right: "16px",
+              width: "52px",
+              height: "52px",
+              borderRadius: "50%",
+              background:
+                "linear-gradient(135deg, oklch(0.55 0.22 260), oklch(0.5 0.2 295))",
+              boxShadow: "0 4px 20px oklch(0.55 0.22 260 / 0.5)",
+              border: "2px solid oklch(0.65 0.18 260 / 0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "20px",
+            }}
+          >
+            🤖
+            {unread > 0 && (
+              <span
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+                style={{ background: "oklch(0.65 0.25 25)", color: "white" }}
+              >
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </button>
+        );
+      })()}
+
+      {/* Max AI Manager Panel */}
+      {maxPanelOpen && (
+        <div
+          data-ocid="feed.max_manager.panel"
+          className="fixed z-50 rounded-2xl overflow-hidden flex flex-col"
+          style={{
+            bottom: "152px",
+            right: "16px",
+            width: "min(340px, calc(100vw - 32px))",
+            maxHeight: "420px",
+            background: "oklch(0.12 0.02 280)",
+            border: "1px solid oklch(0.25 0.04 260 / 0.6)",
+            boxShadow: "0 8px 40px oklch(0.1 0.02 280 / 0.8)",
+          }}
+        >
+          <div
+            className="flex items-center gap-2 px-4 py-3"
+            style={{
+              borderBottom: "1px solid oklch(0.2 0.02 280 / 0.5)",
+              background: "oklch(0.14 0.025 280)",
+            }}
+          >
+            <span className="text-xl">🤖</span>
+            <div>
+              <p className="text-sm font-bold text-white">Max</p>
+              <p className="text-xs" style={{ color: "oklch(0.55 0.08 260)" }}>
+                Your AI Creator Manager
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMaxPanelOpen(false)}
+              className="ml-auto text-muted-foreground hover:text-white transition-colors"
+              data-ocid="feed.max_manager.close_button"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="overflow-y-auto flex-1 p-3 space-y-3">
+            {aiManagerMessages.length === 0 ? (
+              <div
+                data-ocid="feed.max_manager.empty_state"
+                className="text-center py-8"
+              >
+                <p className="text-2xl mb-2">🤖</p>
+                <p className="text-sm text-muted-foreground">
+                  Max is watching your analytics. Check back soon!
+                </p>
+              </div>
+            ) : (
+              aiManagerMessages.map((msg, i) => {
+                const typeStyle = {
+                  tip: {
+                    accent: "oklch(0.65 0.18 240)",
+                    bg: "oklch(0.16 0.03 260 / 0.6)",
+                  },
+                  warning: {
+                    accent: "oklch(0.75 0.18 80)",
+                    bg: "oklch(0.18 0.05 80 / 0.3)",
+                  },
+                  celebration: {
+                    accent: "oklch(0.78 0.18 80)",
+                    bg: "oklch(0.18 0.05 80 / 0.25)",
+                  },
+                  info: {
+                    accent: "oklch(0.62 0.15 200)",
+                    bg: "oklch(0.15 0.04 200 / 0.4)",
+                  },
+                }[msg.type];
+                return (
+                  <div
+                    key={msg.id}
+                    data-ocid={`feed.max_manager.item.${i + 1}`}
+                    className="flex gap-2.5"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-base"
+                      style={{ background: "oklch(0.2 0.04 260 / 0.5)" }}
+                    >
+                      🤖
+                    </div>
+                    <div
+                      className="flex-1 rounded-xl px-3 py-2.5"
+                      style={{
+                        background: typeStyle.bg,
+                        border: `1px solid ${typeStyle.accent}30`,
+                      }}
+                    >
+                      <p
+                        className="text-sm leading-relaxed"
+                        style={{ color: "oklch(0.85 0.04 280)" }}
+                      >
+                        {msg.text}
+                      </p>
+                      <p
+                        className="text-xs mt-1"
+                        style={{ color: "oklch(0.45 0.03 280)" }}
+                      >
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

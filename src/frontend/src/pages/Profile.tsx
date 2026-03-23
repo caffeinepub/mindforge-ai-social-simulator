@@ -114,10 +114,44 @@ export default function Profile({ userId }: Props) {
     navigate,
     audienceMood,
     rivalCreator,
+    legacyScore,
+    updateLegacyScore,
+    celebrityMode,
   } = useApp();
   const isOwnProfile = !userId;
 
+  const [paparazziOpen, setPaparazziOpen] = useState(false);
+  const [paparazziFollowers, setPaparazziFollowers] = useState(0);
   const [simPosts, setSimPosts] = useState<PostItem[]>([]);
+  // Track peak followers for legacy score
+  useEffect(() => {
+    if (!isOwnProfile) return;
+    const followers = profile.followers;
+    if (followers > legacyScore.peakFollowers) {
+      updateLegacyScore({ peakFollowers: followers });
+    }
+  }, [
+    profile.followers,
+    isOwnProfile,
+    legacyScore.peakFollowers,
+    updateLegacyScore,
+  ]);
+
+  // Celebrity paparazzi event
+  useEffect(() => {
+    if (!isOwnProfile || !celebrityMode) return;
+    const timer = setTimeout(
+      () => {
+        const rand = Math.floor(Math.random() * 45000) + 5000;
+        setPaparazziFollowers(rand);
+        setPaparazziOpen(true);
+        setProfile((p) => ({ ...p, followers: p.followers + rand }));
+      },
+      Math.random() * 120000 + 60000,
+    ); // fires 1-3 min after reaching celebrity
+    return () => clearTimeout(timer);
+  }, [isOwnProfile, celebrityMode, setProfile]);
+
   const [simLoading, setSimLoading] = useState(false);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: addSimulatedPost is stable, userId drives re-runs
@@ -756,6 +790,80 @@ export default function Profile({ userId }: Props) {
             </div>
           );
         })()}
+
+      {/* Legacy Score Card */}
+      {isOwnProfile && (
+        <div
+          data-ocid="profile.legacy_score.card"
+          className="glass-card p-4"
+          style={{ border: "1px solid oklch(0.7 0.18 80 / 0.3)" }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🌟</span>
+              <div>
+                <p className="text-xs text-muted-foreground">Legacy Score</p>
+                <p
+                  className="text-sm font-bold"
+                  style={{ color: "oklch(0.78 0.18 80)" }}
+                >
+                  All-time impact — survives New Game
+                </p>
+              </div>
+            </div>
+            {celebrityMode && (
+              <span
+                className="text-xs font-bold px-2 py-1 rounded-full"
+                style={{
+                  background: "oklch(0.7 0.18 80 / 0.2)",
+                  border: "1px solid oklch(0.7 0.18 80 / 0.5)",
+                  color: "oklch(0.82 0.2 80)",
+                }}
+              >
+                ⭐ Celebrity
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              {
+                label: "Total Engagement",
+                value: legacyScore.totalEngagement.toLocaleString(),
+                icon: "❤️",
+              },
+              {
+                label: "Peak Followers",
+                value: legacyScore.peakFollowers.toLocaleString(),
+                icon: "👥",
+              },
+              {
+                label: "Viral Posts",
+                value: legacyScore.viralPosts.toLocaleString(),
+                icon: "🔥",
+              },
+              {
+                label: "Games Played",
+                value: legacyScore.gamesPlayed.toLocaleString(),
+                icon: "🎮",
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl p-3 text-center"
+                style={{ background: "oklch(0.13 0.016 280 / 0.7)" }}
+              >
+                <div className="text-lg mb-1">{stat.icon}</div>
+                <div className="text-sm font-bold text-foreground">
+                  {stat.value}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Creator Level */}
       <div className="glass-card p-5">
@@ -1449,6 +1557,56 @@ export default function Profile({ userId }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Paparazzi Event Modal */}
+      {isOwnProfile && (
+        <Dialog open={paparazziOpen} onOpenChange={setPaparazziOpen}>
+          <DialogContent
+            style={{
+              background: "oklch(0.13 0.016 280)",
+              border: "1px solid oklch(0.7 0.18 80 / 0.5)",
+            }}
+            data-ocid="profile.paparazzi.dialog"
+          >
+            <DialogHeader>
+              <DialogTitle
+                className="text-2xl text-center"
+                style={{ color: "oklch(0.82 0.2 80)" }}
+              >
+                📸 Paparazzi Spotted You!
+              </DialogTitle>
+            </DialogHeader>
+            <div className="text-center py-4">
+              <div className="text-5xl mb-3">⭐</div>
+              <p className="text-foreground text-lg font-bold">
+                You're a Celebrity!
+              </p>
+              <p className="text-muted-foreground mt-2">
+                News is spreading fast...
+              </p>
+              <div
+                className="mt-4 text-3xl font-black"
+                style={{ color: "oklch(0.78 0.18 80)" }}
+              >
+                +{paparazziFollowers.toLocaleString()} followers!
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={() => setPaparazziOpen(false)}
+                className="w-full"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.7 0.18 80), oklch(0.65 0.2 60))",
+                }}
+                data-ocid="profile.paparazzi.close_button"
+              >
+                Amazing! 🎉
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
